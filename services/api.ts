@@ -498,6 +498,17 @@ export const calculateMissionOdds = (player: Player, mission: Mission, modifiers
   return successChance;
 };
 
+// Helper for Heat based on Risk
+const getBaseHeatForRisk = (risk: string) => {
+    switch(risk) {
+        case 'Low': return 5;
+        case 'Medium': return 10;
+        case 'High': return 15;
+        case 'Extreme': return 25;
+        default: return 5;
+    }
+};
+
 // Detailed breakdown for UI Tooltips
 export const getMissionFactors = (player: Player, mission: Mission) => {
   const totals = calculateTotalStats(player);
@@ -522,7 +533,7 @@ export const getMissionFactors = (player: Player, mission: Mission) => {
   // Estimate penalties (approximate logic from resolve function)
   let estHpLoss = Math.max(1, Math.round((5 + mission.costEnr * 0.8) - (totals.def / 5)));
   
-  let estHeatGain = Math.round(5 + (mission.risk === 'High' ? 10 : 5));
+  let estHeatGain = getBaseHeatForRisk(mission.risk);
   if (player.stats.heat > 50) estHeatGain += 5;
   
   // Apply Skill Influence Bonus (Heat Reduction)
@@ -1088,7 +1099,8 @@ export const api = {
             }
         });
 
-        penalties.heatGain = Math.round((mission.risk === 'High' ? 5 : 2) * heatModifier);
+        // Use helper to calculate heat penalty base
+        penalties.heatGain = Math.round(getBaseHeatForRisk(mission.risk) * heatModifier);
 
         // Apply Skill Influence Bonus (Heat Reduction)
         p.unlockedSkills.forEach(skillId => {
@@ -1114,7 +1126,10 @@ export const api = {
         rewards.exp = Math.floor(mission.baseXp * 0.1);
         const totals = calculateTotalStats(p);
         penalties.hpLoss = Math.max(1, Math.round((5 + mission.costEnr * 0.8) - (totals.def / 5)));
-        penalties.heatGain = Math.round((5 + (mission.risk === 'High' ? 10 : 5)) * heatModifier);
+        
+        // Use helper to calculate heat penalty base for failure
+        penalties.heatGain = Math.round((5 + getBaseHeatForRisk(mission.risk)) * heatModifier);
+        
         if (p.stats.heat > 50) penalties.heatGain += 5;
         if (p.faction === FactionId.CRIMSON_VEIL) {
             penalties.heatGain = Math.floor(penalties.heatGain * 0.9);
