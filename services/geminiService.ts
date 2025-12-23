@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Player, Mission, MissionOutcome, MissionType } from "../types";
 import { canCallGemini } from "./aiRateLimit";
@@ -21,6 +22,73 @@ interface NarrativeInput {
 }
 
 /**
+ * Generates the initial mission briefing and refined objectives.
+ */
+export const generateMissionBriefing = async (
+  player: Player, 
+  mission: Mission
+): Promise<{ narrative: string, objectives: string[] } | null> => {
+  if (!process.env.API_KEY) return null;
+
+  const inputData = {
+    mission: mission.title,
+    district: mission.district,
+    description: mission.description,
+    staticObjectives: mission.objectives,
+    playerClass: player.profession,
+    playerFaction: player.faction
+  };
+
+  const cached = getCached({ type: 'BRIEFING', ...inputData });
+  if (cached) return cached;
+
+  if (!canCallGemini(player.id)) return null;
+
+  const prompt = `
+    You are a cyberpunk handler giving a mission briefing.
+    
+    CONTEXT:
+    Mission: ${mission.title} in ${mission.district}.
+    Description: ${mission.description}
+    Agent: ${player.profession} of ${player.faction}.
+
+    TASK:
+    1. Write a short, immersive briefing (max 40 words). Gritty tone.
+    2. Rewrite the provided static objectives to fit the specific generated scenario (make them sound tactical/active).
+
+    INPUT OBJECTIVES:
+    ${JSON.stringify(mission.objectives)}
+
+    OUTPUT JSON FORMAT:
+    {
+      "narrative": "string",
+      "objectives": ["string", "string", "string"]
+    }
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: AI_LIMITS.MODEL,
+      contents: prompt,
+      config: { temperature: 0.9, responseMimeType: "application/json" }
+    });
+
+    const text = response.text?.trim() || "{}";
+    const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+
+    if (parsed.narrative && Array.isArray(parsed.objectives)) {
+      setCached({ type: 'BRIEFING', ...inputData }, parsed);
+      return parsed;
+    }
+    return null;
+  } catch (e) {
+    console.warn("Briefing generation failed", e);
+    return null;
+  }
+};
+
+/**
  * Generates narrative flavor text based on a mission result.
  * Includes Caching, Rate Limiting, and robust Fallbacks.
  */
@@ -37,6 +105,9 @@ export const generateMissionNarrative = async (
       : `[OFFLINE MODE] The ${mission.title} went sideways. You took some hits and had to bail.`;
   }
 
+  // Use the objectives passed in outcome, fallback to mission static objectives
+  const objectivesToUse = outcome.objectives || mission.objectives;
+
   // Prepare Payload for AI & Cache Key
   const inputData: NarrativeInput = {
     success: outcome.success,
@@ -48,7 +119,7 @@ export const generateMissionNarrative = async (
       heat: player.stats.heat
     },
     context: `Mission: ${mission.title} (${mission.district}).`,
-    objectives: mission.objectives
+    objectives: objectivesToUse
   };
 
   // 1. Cache Check
@@ -64,23 +135,27 @@ export const generateMissionNarrative = async (
 
   // 3. Construct Prompt
   const prompt = `
-    You are the mission resolution engine for a text-based cyberpunk mafia game.
-
-    RULES:
-    - Output JSON only
-    - No markdown formatting (no \`\`\`json blocks)
-    - Keep narrative gritty, noir-cyberpunk, under 45 words.
-    - Use provided input values to color the story.
-    - If successful, mention completing specific objectives from the list.
-    - If failed, describe how a specific objective was compromised or failed.
-
-    INPUT:
+    Role: Cyberpunk Game Master.
+    Task: Write a 1-2 sentence resolution for a mission (Max 45 words).
+    
+    CONTEXT:
+    Mission: ${mission.title}
+    Success: ${inputData.success ? 'YES' : 'NO'}
+    
+    KEY OBJECTIVES:
+    ${objectivesToUse.map((o, i) => `${i+1}. ${o}`).join('\n')}
+    
+    INSTRUCTIONS:
+    - Focus on ONE specific objective from the list above.
+    - If SUCCESS: Narrate the specific action the agent took to complete that objective.
+    - If FAILURE: Narrate exactly how that objective failed (e.g. alarm tripped, target escaped).
+    - Tone: Gritty, fast-paced. Do not simply list results.
+    
+    INPUT DATA:
     ${JSON.stringify(inputData)}
-
-    OUTPUT FORMAT:
-    {
-      "narrative": "string"
-    }
+    
+    OUTPUT JSON:
+    { "narrative": "string" }
   `;
 
   // 4. Call API
@@ -162,104 +237,26 @@ export const generateNewsUpdate = async (player: Player): Promise<string> => {
     }
 }
 
-export type AssetType = 'mission' | 'district' | 'player_portrait' | 'achievement' | 'item';
-
 /**
- * Generates Game Assets (Missions, Players, Districts, Items).
- * USES Gemini 3 Pro Image Preview. High Cost - Admin Only.
+ * Generates a market report explaining price fluctuations.
  */
-export const generateGameImage = async (type: AssetType, context: string, size: '1K' | '2K' | '4K' = '1K'): Promise<string | null> => {
-  if (!process.env.API_KEY) {
-    console.warn("No API Key for image generation");
-    return null;
-  }
+export const generateMarketReport = async (trends: { item: string, direction: 'UP' | 'DOWN' }[]): Promise<string> => {
+    if (!process.env.API_KEY) return "Market volatility detected due to local disturbances.";
 
-  // Specific Prompt Templates per Asset Type
-  let prompt = '';
-  switch(type) {
-      case 'mission':
-          prompt = `
-Cyberpunk crime management game illustration.
-Scene context: ${context}.
-Perspective: Cinematic shot or Isometric view suitable for a mission card.
-Style: High-fidelity digital art, atmospheric, gritty.
-Lighting: Dramatic, reflecting the district's mood (e.g., neon for city, industrial glow for factories).
-No text, no UI elements.
-`;
-          break;
-      case 'district':
-          prompt = `
-Cyberpunk city district environment concept art.
-Location: ${context}.
-Atmosphere: Immersive, moody, cinematic lighting, volumetric fog.
-Style: Realistic digital painting, neon-noir, architectural depth, 8k resolution.
-Perspective: Wide angle establishing shot.
-No text, no UI, no watermarks, no people.
-`;
-          break;
-      case 'player_portrait':
-          prompt = `
-Cyberpunk criminal portrait.
-${context}.
-Character facing forward.
-Gritty, realistic, cinematic lighting.
-Neon cyberpunk background.
-No text, no logos.
-`;
-          break;
-      case 'achievement':
-          prompt = `
-Cyberpunk achievement trophy icon.
-${context}.
-Symbolic, futuristic, glowing.
-Dark background, neon accents.
-Centered object, no text.
-`;
-          break;
-      case 'item':
-          prompt = `
-Cyberpunk game item icon.
-${context}.
-Isolated on dark background.
-High detail, glowing neon accents.
-Digital art style.
-No text.
-`;
-          break;
-      default:
-          prompt = `Cyberpunk style art. ${context}`;
-  }
+    const prompt = `
+      Write a short (15-20 words) cyberpunk black market news flash explaining these price shifts:
+      ${trends.map(t => `${t.item} price went ${t.direction}`).join(', ')}.
+      Tone: Underground economic report.
+    `;
 
-  try {
-    console.log(`Generating [${type}] image with prompt (${size}):`, prompt);
-    
-    // Use gemini-3-pro-image-preview for high quality images
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
-      contents: {
-        parts: [{ text: prompt }]
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: "16:9",
-          imageSize: size
-        }
-      }
-    });
-
-    // Extract Base64 from content parts
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        // Return as proper data URI
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
+    try {
+        const response = await ai.models.generateContent({
+            model: AI_LIMITS.MODEL,
+            contents: prompt,
+            config: { temperature: 0.8 }
+        });
+        return response.text?.trim() || "Market prices fluctuating due to corporate intervention.";
+    } catch (e) {
+        return "Market data link unstable.";
     }
-    
-    console.warn("No image data found in response");
-    return null;
-
-  } catch (error) {
-    console.error("Gemini Image Generation Error:", error);
-    return null;
-  }
 };

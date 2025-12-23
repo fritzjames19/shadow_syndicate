@@ -1,3 +1,4 @@
+
 import { AI_LIMITS } from "../config/aiLimits";
 
 const globalCalls: number[] = [];
@@ -39,4 +40,29 @@ export function canCallGemini(playerId: string): boolean {
   calls.push(now);
   
   return true;
+}
+
+export function getRateLimitStats() {
+  const now = Date.now();
+  const HOUR = 60 * 60 * 1000;
+  
+  // Prune before returning stats to ensure accuracy
+  pruneOld(globalCalls, HOUR);
+  
+  let maxPlayerCalls = 0;
+  let activeUsers = 0;
+  
+  playerCalls.forEach((calls, pid) => {
+      pruneOld(calls, HOUR);
+      if (calls.length > 0) activeUsers++;
+      if (calls.length > maxPlayerCalls) maxPlayerCalls = calls.length;
+  });
+
+  return {
+    globalUsage: globalCalls.length,
+    globalLimit: AI_LIMITS.MAX_GLOBAL_CALLS_PER_HOUR,
+    maxPlayerUsage: maxPlayerCalls,
+    playerLimit: AI_LIMITS.MAX_PLAYER_CALLS_PER_HOUR,
+    activeAiUsers: activeUsers
+  };
 }

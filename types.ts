@@ -3,14 +3,137 @@ export enum FactionId {
   IRON_WOLVES = 'IRON_WOLVES',
   JADE_SERPENTS = 'JADE_SERPENTS',
   CRIMSON_VEIL = 'CRIMSON_VEIL',
-  CHROME_SAINTS = 'CHROME_SAINTS',
+  CHROME_SAINTS = 'CHROME_SAINTS'
 }
 
 export enum ProfessionId {
   ENFORCER = 'ENFORCER',
   HACKER = 'HACKER',
   FIXER = 'FIXER',
-  SMUGGLER = 'SMUGGLER',
+  SMUGGLER = 'SMUGGLER'
+}
+
+export enum District {
+  DOCKS = 'DOCKS',
+  NEON_ROW = 'NEON_ROW',
+  FURNACE = 'FURNACE',
+  GILDED_HEIGHTS = 'GILDED_HEIGHTS',
+  SPRAWL = 'SPRAWL',
+  CIRCUIT_BAY = 'CIRCUIT_BAY',
+  OLD_TOWN = 'OLD_TOWN',
+  UNDERCITY = 'UNDERCITY',
+  CORPORATE_PLAZA = 'CORPORATE_PLAZA',
+  SHADOWS = 'SHADOWS',
+  GOVERNMENT = 'GOVERNMENT',
+  NEXUS = 'NEXUS'
+}
+
+export enum MissionType {
+  STORY = 'STORY',
+  SIDE_JOB = 'SIDE_JOB',
+  CONTRACT = 'CONTRACT'
+}
+
+export enum ItemType {
+  WEAPON = 'WEAPON',
+  ARMOR = 'ARMOR',
+  CONSUMABLE = 'CONSUMABLE',
+  GADGET = 'GADGET'
+}
+
+export enum ItemRarity {
+  COMMON = 'COMMON',
+  UNCOMMON = 'UNCOMMON',
+  RARE = 'RARE',
+  EPIC = 'EPIC',
+  LEGENDARY = 'LEGENDARY'
+}
+
+export interface PlayerStats {
+  atk: number;
+  def: number;
+  hp: number;
+  maxHp: number;
+  enr: number;
+  maxEnr: number;
+  sta: number;
+  maxSta: number;
+  lck: number;
+  cInt: number;
+  heat: number;
+}
+
+export interface CrewMember {
+  id: string;
+  name: string;
+  type: string;
+  atk: number;
+  def: number;
+  cost: number;
+  upkeep: number;
+  isActive: boolean;
+  trait?: string;
+  traitDescription?: string;
+}
+
+export interface Item {
+  id: string;
+  name: string;
+  type: ItemType;
+  rarity: ItemRarity;
+  bonus: number;
+  cost: number;
+  description: string;
+  imageUrl?: string;
+}
+
+export interface MarketItem extends Item {
+  currentPrice: number;
+  trend: 'UP' | 'DOWN' | 'STABLE';
+  trendValue: number; // e.g., 1.2 for +20%
+}
+
+export interface MarketState {
+  items: MarketItem[];
+  lastUpdate: number;
+  news: string;
+}
+
+export interface Equipment {
+  weapon: Item | null;
+  armor: Item | null;
+  gadget: Item | null;
+}
+
+export interface Player {
+  id: string;
+  name: string;
+  faction: FactionId;
+  profession: ProfessionId;
+  level: number;
+  xp: number;
+  stats: PlayerStats;
+  wallet: number;
+  crew: CrewMember[];
+  day: number;
+  inventory: Item[];
+  equipment: Equipment;
+  
+  skillPoints: number;
+  unlockedSkills: string[];
+
+  lastEnergyUpdate: number;
+  lastStaminaUpdate: number;
+  lastHeatUpdate: number;
+  
+  missionCooldowns: Record<string, number>;
+  missionMastery: Record<string, number>;
+  
+  currentNews: string;
+  loginStreak: number;
+  lastLoginDate: string;
+  badges: string[];
+  portraitUrl?: string;
 }
 
 export interface Faction {
@@ -23,118 +146,84 @@ export interface Faction {
 export interface Profession {
   id: ProfessionId;
   name: string;
+  role: string;
   description: string;
-  role: string; // e.g. "The Muscle"
   bonuses: string[];
   uniqueAbility: string;
-  color: string; // Tailwind color class for borders/text
+  color: string;
 }
 
-export interface CrewMember {
+export interface Mission {
   id: string;
-  name: string;
-  type: 'Thug' | 'Soldier' | 'Enforcer';
-  atk: number;
-  def: number;
-  cost: number; // Hire cost
-  upkeep: number; // Daily upkeep
-  trait?: string; // Schema placeholder
-  isActive: boolean; // For toggling participation
-}
-
-export enum ItemType {
-  WEAPON = 'WEAPON',
-  ARMOR = 'ARMOR',
-  CONSUMABLE = 'CONSUMABLE',
-}
-
-export enum ItemRarity {
-  COMMON = 'COMMON',
-  UNCOMMON = 'UNCOMMON',
-  RARE = 'RARE',
-  EPIC = 'EPIC',
-  LEGENDARY = 'LEGENDARY',
-  MYTHIC = 'MYTHIC',
-}
-
-export interface Item {
-  id: string;
-  name: string;
-  type: ItemType;
-  rarity: ItemRarity;
-  bonus: number;
-  cost: number;
+  title: string;
   description: string;
-  imageUrl?: string; // Phase 3 Asset
+  district: District;
+  minLevel: number;
+  type: MissionType;
+  difficulty: number;
+  risk: 'Low' | 'Medium' | 'High' | 'Extreme';
+  costEnr: number;
+  baseReward: number;
+  baseXp: number;
+  /**
+   * Specific tactical goals for the mission.
+   * Required for AI narrative generation to describe specific actions.
+   */
+  objectives: string[];
+  baseSuccessChance: number;
+  imageUrl?: string;
 }
 
-export interface PlayerStats {
-  atk: number; // Attack Power
-  def: number; // Defense Rating
-  hp: number;  // Health
-  maxHp: number;
-  enr: number; // Energy
-  maxEnr: number;
-  sta: number; // Stamina (New)
-  maxSta: number;
-  lck: number; // Luck
-  cInt: number; // Crypto-Intel (New)
-  heat: number;
+export interface DistrictMeta {
+  id: District;
+  name: string;
+  description: string;
+  imageUrl?: string;
+}
+
+export interface SkillEffect {
+  type: 'STAT_FLAT' | 'MISSION_BONUS';
+  target: string;
+  value: number;
 }
 
 export interface Skill {
   id: string;
   name: string;
-  tree: 'COMBAT' | 'OPERATIONS' | 'PROFESSION';
+  tree: 'PROFESSION' | 'COMBAT' | 'OPERATIONS';
+  requiredProfession?: ProfessionId;
   description: string;
   cost: number;
-  // Effect definition for logic application
-  effect: {
-    type: 'STAT_FLAT' | 'STAT_PERCENT' | 'MISSION_BONUS';
-    target: keyof PlayerStats | 'success_chance' | 'money_reward' | 'heat_reduction';
-    value: number;
-  };
-  requiredProfession?: ProfessionId; // If null, available to all
+  effect: SkillEffect;
 }
 
-export interface Player {
-  id: string;
-  name: string;
-  faction: FactionId;
-  profession: ProfessionId;
-  level: number;
-  xp: number;
-  stats: PlayerStats;
-  wallet: number; // $GANG
-  crew: CrewMember[];
-  day: number;
-  inventory: Item[];
-  equipment: {
-    weapon: Item | null;
-    armor: Item | null;
-  };
-  
-  // Skills System
-  skillPoints: number;
-  unlockedSkills: string[]; // Array of Skill IDs
-
-  lastEnergyUpdate: number; // Timestamp for regeneration (1/min)
-  lastStaminaUpdate: number; // Timestamp for regeneration (1/5min)
-  lastHeatUpdate: number; // Timestamp for heat decay
-  missionCooldowns: { [key: string]: number }; // Mission ID -> Unlock Timestamp
-  missionMastery: { [missionId: string]: number }; // Mission ID -> Mastery XP (0-100)
-  currentNews: string; // World flavor text
-  
-  // Phase 2: Retention
-  loginStreak: number;
-  lastLoginDate: string; // YYYY-MM-DD
-  badges: string[]; // Cosmetic achievements
-
-  // Phase 3: Assets
-  portraitUrl?: string; // AI Generated Avatar
+// COMBAT TYPES
+export interface Enemy {
+    id: string;
+    name: string;
+    hp: number;
+    maxHp: number;
+    atk: number;
+    def: number;
+    type: 'HUMAN' | 'MECH' | 'CYBORG';
+    district?: District; // If null, generic enemy
 }
 
-// Section 17: Database Schema - Mission Runs
+export interface CombatLog {
+    turn: number;
+    message: string;
+    type: 'PLAYER_HIT' | 'ENEMY_HIT' | 'INFO' | 'FAILURE';
+    damage?: number;
+}
+
+export interface CombatState {
+    isActive: boolean;
+    turnCount: number;
+    enemy: Enemy;
+    logs: CombatLog[];
+    playerDefending: boolean;
+}
+
 export interface MissionRun {
   id: string;
   playerId: string;
@@ -146,9 +235,12 @@ export interface MissionRun {
   heatChange: number;
   narrative: string;
   timestamp: number;
+  objectives?: string[]; // Dynamic objectives generated during briefing
+  
+  // New Combat Field
+  combatState?: CombatState;
 }
 
-// Section 17: Database Schema - Heat Events
 export interface HeatEvent {
   id: string;
   playerId: string;
@@ -159,7 +251,6 @@ export interface HeatEvent {
   timestamp: number;
 }
 
-// Section 26: Admin / Debug
 export interface AdminMetrics {
   totalPlayers: number;
   activePlayers24h: number;
@@ -171,74 +262,18 @@ export interface AdminMetrics {
 export interface AdminAuditLog {
   id: string;
   action: string;
-  targetId: string;
-  payload: any;
   timestamp: number;
-}
-
-export interface AdminAdjustment {
-  gangDelta?: number;
-  xpDelta?: number;
-  heatDelta?: number;
-  hpDelta?: number;
 }
 
 export interface DailyRewardResult {
   claimed: boolean;
   streak: number;
+  message: string;
   reward?: {
     gang?: number;
     energy?: number;
     badge?: string;
   };
-  message: string;
-}
-
-export enum MissionType {
-  STORY = 'STORY',
-  SIDE_JOB = 'SIDE_JOB',
-  CONTRACT = 'CONTRACT',
-}
-
-export enum District {
-  DOCKS = 'The Docks', // Lv 1-10
-  NEON_ROW = 'Neon Row', // Lv 5-15
-  FURNACE = 'The Furnace', // Lv 10-20
-  GILDED_HEIGHTS = 'Gilded Heights', // Lv 15-25
-  SPRAWL = 'The Sprawl', // Lv 20-30
-  CIRCUIT_BAY = 'Circuit Bay', // Lv 25-35
-  OLD_TOWN = 'Old Town', // Lv 30-40
-  UNDERCITY = 'The Undercity', // Lv 35-45
-  CORPORATE_PLAZA = 'Corporate Plaza', // Lv 40-50
-  SHADOWS = 'The Shadows', // Lv 45-55
-  GOVERNMENT = 'Government District', // Lv 50-60
-  NEXUS = 'The Nexus', // Lv 60+
-}
-
-export interface DistrictMeta {
-  id: District;
-  name: string;
-  description: string;
-  imageUrl?: string;
-}
-
-export interface Mission {
-  id: string;
-  title: string;
-  description: string;
-  district: District;
-  minLevel: number;
-  type: MissionType;
-  difficulty: number; // 1-10
-  risk: 'Low' | 'Medium' | 'High' | 'Extreme';
-  costEnr: number;
-  baseReward: number;
-  baseXp: number;
-  objectives: string[]; // Specific goals for the AI to reference
-  baseSuccessChance: number; // 0.0 - 1.0 (Decimal)
-  
-  // Phase 3: Assets
-  imageUrl?: string; 
 }
 
 export interface MissionOutcome {
@@ -253,6 +288,8 @@ export interface MissionOutcome {
     heatGain: number;
   };
   missionId?: string;
+  capReached?: boolean;
+  objectives?: string[]; // To display which objectives were cleared/failed
 }
 
 export interface MissionDecision {
@@ -269,6 +306,7 @@ export interface MissionDecision {
 export interface MissionScenario {
   narrative: string; // The situation description
   choices: MissionDecision[];
+  objectives?: string[]; // Dynamic objectives generated by AI
 }
 
 export interface ApiResponse<T> {
@@ -277,6 +315,7 @@ export interface ApiResponse<T> {
   message?: string;
   narrative?: string;
   missionResult?: MissionOutcome;
+  combatState?: CombatState;
 }
 
 export interface LogEntry {

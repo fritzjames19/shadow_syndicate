@@ -3,18 +3,15 @@ import CharacterCreation from './components/CharacterCreation';
 import AdminPanel from './components/AdminPanel';
 import { DistrictBanner, PlayerCard, MissionCard, MissionGrid, MissionResult, DailyRewardsCard, RewardModal, ActiveMission, MissionStructureInfo } from './components/GameUI';
 import { SkillTreeUI } from './components/SkillTreeUI';
-import { Player, FactionId, ProfessionId, Mission, MissionType, CrewMember, LogEntry, Item, ItemType, ItemRarity, MissionOutcome, DistrictMeta, District, DailyRewardResult } from './types';
+import { InventoryMarketUI } from './components/InventoryMarketUI';
+import { CrewUI } from './components/CrewUI';
+import { CombatUI } from './components/CombatUI';
+import { Player, FactionId, ProfessionId, Mission, MissionType, CrewMember, LogEntry, Item, ItemType, ItemRarity, MissionOutcome, DistrictMeta, District, DailyRewardResult, CombatState } from './types';
 import { api } from './services/api';
-
-const CREW_TYPES: CrewMember[] = [
-  { id: 'recruit_thug', name: 'Street Thug', type: 'Thug', atk: 5, def: 0, cost: 500, upkeep: 10, isActive: true },
-  { id: 'recruit_soldier', name: 'Soldier', type: 'Soldier', atk: 15, def: 5, cost: 2500, upkeep: 25, isActive: true },
-  { id: 'recruit_enforcer', name: 'Enforcer', type: 'Enforcer', atk: 35, def: 10, cost: 10000, upkeep: 50, isActive: true },
-];
 
 const App: React.FC = () => {
   // --- STATE ---
-  const [view, setView] = useState<'CREATION' | 'DASHBOARD' | 'MISSIONS' | 'ACTIVE_MISSION' | 'MISSION_RESULT' | 'CREW' | 'INVENTORY' | 'SKILLS'>('CREATION');
+  const [view, setView] = useState<'CREATION' | 'DASHBOARD' | 'MISSIONS' | 'ACTIVE_MISSION' | 'MISSION_RESULT' | 'MARKET' | 'SKILLS' | 'CREW' | 'COMBAT'>('CREATION');
   const [player, setPlayer] = useState<Player | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -32,6 +29,7 @@ const App: React.FC = () => {
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [activeMission, setActiveMission] = useState<Mission | null>(null);
   const [lastMissionResult, setLastMissionResult] = useState<MissionOutcome | null>(null);
+  const [combatState, setCombatState] = useState<CombatState | null>(null);
 
   // Daily Reward State
   const [dailyRewardResult, setDailyRewardResult] = useState<DailyRewardResult | null>(null);
@@ -106,14 +104,23 @@ const App: React.FC = () => {
           // Check for pending missions (Crash Recovery)
           const pendingId = await api.system.getPendingMission(dash.data.id);
           if (pendingId) {
-             // We need to re-find the mission object to resume properly
-             // This is a bit tricky without storing missionId separately in state, but we can try to fetch run details if API supported it.
-             // For prototype stability, we just warn for now or reset if we can't find mission object.
-             // Ideally we'd fetch the specific mission from the run ID.
              setActiveRunId(pendingId);
-             // Attempt to find mission from generic list if possible, otherwise we might be in inconsistent state
-             // In a real app, `getPendingMission` would return the full object.
-             addLog("Pending operation detected. Please resume via dashboard if available.", 'DANGER');
+             // Attempt to verify if it's combat or normal
+             const scenario = await api.missions.getScenario(pendingId);
+             if (scenario.combatState && scenario.combatState.isActive) {
+                 setCombatState(scenario.combatState);
+                 setView('COMBAT');
+                 addLog("COMBAT LINK RE-ESTABLISHED.", 'DANGER');
+             } else {
+                 // Try to guess mission from ID if we can (limitation of mock API, ideally api returns full mission obj)
+                 // For now, if we can't find the mission object, we might default to Docks or just error gracefully.
+                 // We will try to find the mission in the list that matches the run (not implemented in mock, but assumed safe for now)
+                 // Just set active mission to something safe or null, logic will handle "Loading" in ActiveMission
+                 
+                 // Find mission from run if possible (Requires new API endpoint in real app, hacking it via scenario)
+                 setView('ACTIVE_MISSION');
+                 addLog("Pending operation detected. Resuming.", 'DANGER');
+             }
           } else {
              setView('DASHBOARD');
           }
@@ -178,24 +185,6 @@ const App: React.FC = () => {
     }, 1000);
   }
 
-  const handleRecruit = async (crewType: any) => {
-    const res = await api.crew.hire(crewType.type);
-    if (res.success && res.data) {
-      setPlayer(res.data);
-      addLog(res.message || "Recruited.", 'SUCCESS');
-    } else {
-      addLog(res.message || "Failed.", 'FAILURE');
-    }
-  };
-
-  const handleToggleCrew = async (crewId: string) => {
-      const res = await api.crew.toggle(crewId);
-      if (res.success && res.data) {
-          setPlayer(res.data);
-          addLog(res.message || "Crew status updated.", 'INFO');
-      }
-  }
-
   const handleClaimReward = async () => {
     setProcessing(true);
     const res = await api.player.claimDailyReward();
@@ -216,14 +205,11 @@ const App: React.FC = () => {
     setProcessing(true);
     addLog(`Initiating Operation: ${mission.title}...`, 'INFO');
     
-    // API CALL: Start
     const res = await api.missions.start(mission.id);
     
     if (res.success && res.data) {
-      // @ts-ignore - The api type is complex, but we know it returns missionRunId
       setActiveRunId(res.data.missionRunId);
       setActiveMission(mission);
-      // We manually deduct energy in UI just for immediate feedback, though state update will handle it
       setPlayer(prev => prev ? { ...prev, stats: { ...prev.stats, enr: prev.stats.enr - mission.costEnr } } : null);
       
       addLog("Link Established. Analyzing tactical options...", 'SUCCESS');
@@ -235,17 +221,24 @@ const App: React.FC = () => {
     setProcessing(false);
   };
 
-  // STEP 2: RESOLVE MISSION
+  // STEP 2: RESOLVE MISSION (OR START COMBAT)
   const handleMissionResolve = async (decisionId?: string) => {
     if (!activeRunId) return;
     setProcessing(true);
-    // addLog("Executing tactical decision...", 'INFO'); // UI handles the visual feedback now
 
     const res = await api.missions.resolve(activeRunId, decisionId);
 
-    if (res.success !== undefined && res.data) {
+    if (res.success && res.data) {
         setPlayer(res.data);
-        if (res.missionResult) {
+        
+        // CHECK IF COMBAT TRIGGERED
+        if (res.combatState && res.combatState.isActive) {
+            setCombatState(res.combatState);
+            setView('COMBAT');
+            addLog("COMBAT PROTOCOL INITIATED.", 'DANGER');
+        } 
+        // OR MISSION COMPLETED
+        else if (res.missionResult) {
             setLastMissionResult(res.missionResult);
             setActiveRunId(null);
             setActiveMission(null);
@@ -260,44 +253,34 @@ const App: React.FC = () => {
     setProcessing(false);
   }
 
+  // STEP 3: COMBAT ACTION
+  const handleCombatAction = async (action: 'ATTACK' | 'HEAVY' | 'DEFEND' | 'FLEE') => {
+      if (!activeRunId) return;
+      
+      const res = await api.combat.action(activeRunId, action);
+      
+      if (res.success && res.data) {
+          setPlayer(res.data);
+          
+          if (res.missionResult) {
+              // Combat Ended (Win or Loss)
+              setLastMissionResult(res.missionResult);
+              setCombatState(null);
+              setActiveRunId(null);
+              setActiveMission(null);
+              setView('MISSION_RESULT');
+              addLog(res.missionResult.success ? "Target Neutralized." : "Critical Injury. Evacuating.", res.missionResult.success ? 'SUCCESS' : 'FAILURE');
+          } else if (res.combatState) {
+              // Combat Continues
+              setCombatState(res.combatState);
+          }
+      }
+  };
+
   const handleMissionContinue = () => {
       setLastMissionResult(null);
       // Return to missions list
       setView('MISSIONS');
-  };
-
-  const handleBuyItem = async (item: Item) => {
-    const res = await api.items.buy(item.id);
-    if (res.success && res.data) {
-      setPlayer(res.data);
-      addLog(res.message || "Bought item.", 'SUCCESS');
-    } else {
-      addLog(res.message || "Cannot buy.", 'FAILURE');
-    }
-  };
-
-  const handleEquipItem = async (item: Item) => {
-    const res = await api.items.equip(item.id);
-    if (res.success && res.data) {
-      setPlayer(res.data);
-      addLog(res.message || "Equipped.", 'INFO');
-    }
-  };
-
-  const handleUnequipItem = async (slot: 'weapon' | 'armor') => {
-    const res = await api.items.unequip(slot);
-    if (res.success && res.data) {
-      setPlayer(res.data);
-      addLog(res.message || "Unequipped.", 'INFO');
-    }
-  };
-
-  const handleUseItem = async (item: Item) => {
-    const res = await api.items.use(item.id);
-    if (res.success && res.data) {
-      setPlayer(res.data);
-      addLog(res.message || "Used item.", 'SUCCESS');
-    }
   };
 
   // --- RENDER ---
@@ -381,19 +364,36 @@ const App: React.FC = () => {
             <div className="space-y-2">
                 <button 
                     onClick={() => setView('DASHBOARD')}
-                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'DASHBOARD' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'}`}
+                    disabled={view === 'COMBAT'}
+                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'DASHBOARD' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
                     Dashboard
                 </button>
                 <button 
                     onClick={() => setView('MISSIONS')}
-                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'MISSIONS' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'}`}
+                    disabled={view === 'COMBAT'}
+                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'MISSIONS' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
                     Missions
                 </button>
                 <button 
+                    onClick={() => setView('CREW')}
+                    disabled={view === 'COMBAT'}
+                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'CREW' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                >
+                    Syndicate Crew
+                </button>
+                <button 
+                    onClick={() => setView('MARKET')}
+                    disabled={view === 'COMBAT'}
+                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'MARKET' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                >
+                    Shadow Market
+                </button>
+                <button 
                     onClick={() => setView('SKILLS')}
-                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'SKILLS' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'}`}
+                    disabled={view === 'COMBAT'}
+                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'SKILLS' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
                     Neural Skills
                 </button>
@@ -446,7 +446,7 @@ const App: React.FC = () => {
                      </div>
                      <div className="bg-zinc-900 border border-zinc-800 p-4 rounded">
                         <h3 className="text-xs text-zinc-500 uppercase tracking-widest mb-4">Quick Actions</h3>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 mb-3">
                             <button onClick={handleRest} disabled={processing} className="flex-1 bg-zinc-800 hover:bg-white hover:text-black py-2 text-xs font-bold uppercase transition-colors">
                                 Safehouse Rest
                             </button>
@@ -454,6 +454,12 @@ const App: React.FC = () => {
                                 Wait (Day Cycle)
                             </button>
                         </div>
+                        <button 
+                            onClick={() => setShowMissionIntel(true)}
+                            className="w-full bg-zinc-800/50 hover:bg-neon-blue hover:text-black py-2 text-xs font-bold uppercase transition-colors border border-zinc-700 text-zinc-400 hover:border-neon-blue"
+                        >
+                            View Mission Intel
+                        </button>
                      </div>
                  </div>
              </div>
@@ -503,6 +509,15 @@ const App: React.FC = () => {
              />
          )}
 
+         {/* COMBAT VIEW */}
+         {view === 'COMBAT' && combatState && player && (
+             <CombatUI 
+                player={player} 
+                combatState={combatState} 
+                onAction={handleCombatAction} 
+             />
+         )}
+
          {/* RESULT VIEW */}
          {view === 'MISSION_RESULT' && lastMissionResult && (
              <MissionResult 
@@ -510,6 +525,24 @@ const App: React.FC = () => {
                 mission={missions.find(m => m.id === lastMissionResult.missionId) || missions[0]}
                 onClose={handleMissionContinue}
              />
+         )}
+
+         {/* CREW VIEW */}
+         {view === 'CREW' && (
+            <CrewUI 
+              player={player}
+              onUpdate={setPlayer}
+              onLog={addLog}
+            />
+         )}
+
+         {/* MARKET VIEW */}
+         {view === 'MARKET' && (
+            <InventoryMarketUI 
+              player={player} 
+              onUpdate={setPlayer} 
+              onLog={addLog}
+            />
          )}
 
          {/* SKILLS VIEW */}

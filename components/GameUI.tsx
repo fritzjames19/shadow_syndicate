@@ -1,11 +1,57 @@
+
 import React, { useEffect, useState } from 'react';
 import { Player, Mission, MissionOutcome, DistrictMeta, MissionType, DailyRewardResult, MissionDecision } from '../types';
-import { getMissionFactors, api } from '../services/api';
+import { getMissionFactors, api, getMissionMasteryReward } from '../services/api';
 
-// --- MISSION STRUCTURE INFO MODAL ---
+// --- INTERFACES ---
+
 interface MissionStructureInfoProps {
   onClose: () => void;
 }
+
+interface DistrictBannerProps {
+  district: DistrictMeta;
+}
+
+interface PlayerCardProps {
+  player: Player;
+}
+
+interface DailyRewardsCardProps {
+  player: Player;
+  onClaim: () => void;
+  processing: boolean;
+}
+
+interface RewardModalProps {
+  result: DailyRewardResult;
+  onClose: () => void;
+}
+
+interface MissionCardProps {
+  mission: Mission;
+  player: Player;
+  onRun: (mission: Mission) => void;
+  cooldownTime: number;
+}
+
+interface MissionGridProps {
+  children: React.ReactNode;
+}
+
+interface ActiveMissionProps {
+  mission: Mission;
+  runId: string;
+  onResolve: (decisionId?: string) => void;
+}
+
+interface MissionResultProps {
+  result: MissionOutcome;
+  mission: Mission;
+  onClose: () => void;
+}
+
+// --- COMPONENTS ---
 
 export const MissionStructureInfo: React.FC<MissionStructureInfoProps> = ({ onClose }) => {
   return (
@@ -103,84 +149,7 @@ export const MissionStructureInfo: React.FC<MissionStructureInfoProps> = ({ onCl
             </p>
         </div>
 
-        {/* CRAFTING MATERIALS SECTION */}
-        <div className="mt-8">
-            <div className="border border-yellow-500/20 bg-yellow-500/5 rounded-lg p-6">
-                <h3 className="text-yellow-500 font-bold uppercase tracking-widest text-sm mb-4">Crafting Materials</h3>
-                
-                <div className="flex items-center gap-3 mb-6 text-zinc-400 text-xs">
-                    <span className="text-yellow-500 text-lg">🔧</span>
-                    <p>Missions drop crafting materials used to upgrade gear, build rackets, and create consumables.</p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-black/60 border border-zinc-800 p-4 rounded flex flex-col">
-                        <div className="text-yellow-500 font-bold text-sm mb-1">Scrap Metal</div>
-                        <div className="text-zinc-500 text-xs">Weapon crafting</div>
-                    </div>
-                    <div className="bg-black/60 border border-zinc-800 p-4 rounded flex flex-col">
-                        <div className="text-cyan-400 font-bold text-sm mb-1">Circuit Boards</div>
-                        <div className="text-zinc-500 text-xs">Tech upgrades</div>
-                    </div>
-                    <div className="bg-black/60 border border-zinc-800 p-4 rounded flex flex-col">
-                        <div className="text-red-600 font-bold text-sm mb-1">Blood Diamonds</div>
-                        <div className="text-zinc-500 text-xs">Legendary crafts</div>
-                    </div>
-                    <div className="bg-black/60 border border-zinc-800 p-4 rounded flex flex-col">
-                        <div className="text-white font-bold text-sm mb-1">Contraband</div>
-                        <div className="text-zinc-500 text-xs">Trade goods</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {/* MISSION MASTERY SYSTEM SECTION */}
-        <div className="mt-8 border border-red-900/30 bg-red-950/10 rounded-lg p-6">
-            <h3 className="text-red-600 font-bold uppercase tracking-widest text-sm mb-4">Mission Mastery System</h3>
-            
-            <p className="text-zinc-400 text-xs mb-6">
-                Complete missions multiple times to increase mastery level (1-5 stars). Higher mastery unlocks:
-            </p>
-
-            <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                    <span className="text-red-600 mt-0.5 text-xs">●</span>
-                    <div className="text-xs">
-                        <span className="text-white font-bold mr-2">★</span>
-                        <span className="text-zinc-300">10% increased loot drops</span>
-                    </div>
-                </div>
-                <div className="flex items-start gap-3">
-                    <span className="text-red-600 mt-0.5 text-xs">●</span>
-                    <div className="text-xs">
-                        <span className="text-white font-bold mr-2">★★</span>
-                        <span className="text-zinc-300">Reduced energy cost (-20%)</span>
-                    </div>
-                </div>
-                <div className="flex items-start gap-3">
-                    <span className="text-red-600 mt-0.5 text-xs">●</span>
-                    <div className="text-xs">
-                        <span className="text-white font-bold mr-2">★★★</span>
-                        <span className="text-zinc-300">Access to Hard Mode variant</span>
-                    </div>
-                </div>
-                <div className="flex items-start gap-3">
-                    <span className="text-red-600 mt-0.5 text-xs">●</span>
-                    <div className="text-xs">
-                        <span className="text-white font-bold mr-2">★★★★</span>
-                        <span className="text-zinc-300">Exclusive mastery cosmetic</span>
-                    </div>
-                </div>
-                <div className="flex items-start gap-3">
-                    <span className="text-red-600 mt-0.5 text-xs">●</span>
-                    <div className="text-xs">
-                        <span className="text-white font-bold mr-2">★★★★★</span>
-                        <span className="text-zinc-300">Unique NFT reward (one-time)</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        {/* Action Button */}
         <button 
             onClick={onClose}
             className="mt-8 w-full py-3 bg-zinc-800 hover:bg-white hover:text-black text-white font-bold uppercase tracking-widest rounded transition-colors"
@@ -192,297 +161,186 @@ export const MissionStructureInfo: React.FC<MissionStructureInfoProps> = ({ onCl
   );
 };
 
-// --- DISTRICT BANNER ---
-interface DistrictBannerProps {
-  district: DistrictMeta;
-}
-
 export const DistrictBanner: React.FC<DistrictBannerProps> = ({ district }) => {
   return (
-    <div className="relative h-48 md:h-64 w-full rounded-b-xl overflow-hidden border-b border-zinc-800 shadow-2xl mb-6 group">
-      {district.imageUrl ? (
-        <img 
-          src={district.imageUrl} 
-          alt={district.name} 
-          className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
-        />
-      ) : (
-        <div className="w-full h-full bg-zinc-900 flex flex-col items-center justify-center p-4 border-b-4 border-neon-red/20 relative overflow-hidden">
-             {/* Tech Pattern Background */}
-             <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-             <div className="text-neon-red text-6xl font-bold opacity-20 uppercase tracking-widest mb-2 select-none">OFFLINE</div>
-             <div className="text-zinc-500 text-xs tracking-[0.3em] uppercase">Visual Uplink Required</div>
+    <div className="mb-8 border-l-4 border-neon-blue bg-zinc-900/50 p-6 rounded-r-xl shadow-lg border-y border-r border-zinc-800">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h2 className="text-4xl font-bold text-white uppercase tracking-tighter mb-2">{district.name}</h2>
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-[10px] uppercase tracking-widest text-zinc-500">Sector Active</span>
+                </div>
+            </div>
+            <div className="hidden md:block text-right">
+                <div className="text-[10px] uppercase text-zinc-600 tracking-[0.2em] font-bold">Security Level</div>
+                <div className="text-xl font-bold text-red-500">EXTREME</div>
+            </div>
         </div>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 p-6 w-full pointer-events-none">
-        <h2 className="text-4xl font-bold text-white uppercase tracking-tighter drop-shadow-lg mb-1">{district.name}</h2>
-        <p className="text-neon-blue text-sm uppercase tracking-widest max-w-xl drop-shadow-md bg-black/60 inline-block px-2 py-1">{district.description}</p>
-      </div>
+        <p className="text-zinc-300 max-w-2xl text-sm leading-relaxed border-t border-zinc-800/50 pt-4 mt-2">
+            {district.description}
+        </p>
     </div>
   );
 };
-
-// --- PLAYER CARD ---
-interface PlayerCardProps {
-  player: Player;
-}
 
 export const PlayerCard: React.FC<PlayerCardProps> = ({ player }) => {
-  const xpProgress = (player.xp / (Math.round(100 * Math.pow(player.level, 1.4)))) * 100;
-  
-  // Attribute config for cleaner mapping
-  const attributes = [
-    { label: 'ATTACK POWER', code: 'ATK', val: player.stats.atk, color: 'text-neon-red', icon: '🎯' },
-    { label: 'DEFENSE RATING', code: 'DEF', val: player.stats.def, color: 'text-neon-blue', icon: '🛡️' },
-    { label: 'MAX ENERGY', code: 'ENR', val: `${player.stats.enr}/${player.stats.maxEnr}`, color: 'text-yellow-400', icon: '⚡' },
-    { label: 'MAX STAMINA', code: 'STA', val: `${player.stats.sta}/${player.stats.maxSta}`, color: 'text-orange-400', icon: '✨' },
-    { label: 'MAX HEALTH', code: 'HP', val: `${player.stats.hp}/${player.stats.maxHp}`, color: 'text-red-600', icon: '❤️' },
-    { label: 'LUCK FACTOR', code: 'LCK', val: player.stats.lck, color: 'text-cyan-400', icon: '🎲' },
-    { label: 'CRYPTO-INTEL', code: 'C-INT', val: player.stats.cInt, color: 'text-teal-400', icon: '🧠' },
-  ];
-
-  return (
-    <div className="space-y-4">
-      {/* HEADER SECTION */}
-      <div className="bg-zinc-900/80 border border-zinc-800 rounded-lg p-4 flex gap-4 items-center shadow-lg backdrop-blur-sm">
-        <div className="w-20 h-20 rounded-full border-2 border-neon-blue overflow-hidden shrink-0 relative bg-black">
-          {player.portraitUrl ? (
-            <img src={player.portraitUrl} alt="Player" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-zinc-700 text-xs bg-zinc-800">
-              <span className="opacity-50">NO IMG</span>
+    // Helper to render bars
+    const renderBar = (label: string, current: number, max: number, colorClass: string) => (
+        <div className="mb-2">
+            <div className="flex justify-between text-[10px] uppercase font-bold tracking-wider mb-1">
+                <span className="text-zinc-400">{label}</span>
+                <span className="text-white">{current} / {max}</span>
             </div>
-          )}
+            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                <div className={`h-full ${colorClass}`} style={{ width: `${Math.min(100, (current / max) * 100)}%` }}></div>
+            </div>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex justify-between items-baseline mb-1">
-             <h3 className="text-xl font-bold text-white truncate">{player.name}</h3>
-             <span className="text-xs text-neon-green font-bold">LVL {player.level}</span>
-          </div>
-          <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-            <span>{player.faction}</span>
-            <span className="text-zinc-700">•</span>
-            <span className="text-neon-blue font-bold">{player.profession}</span>
-          </div>
-          
-          <div className="flex-1">
-             <span className="text-zinc-600 uppercase text-[10px] block mb-1">Reputation (XP)</span>
-             <div className="h-1.5 bg-zinc-800 w-full rounded-full overflow-hidden">
-                <div className="h-full bg-neon-purple" style={{ width: `${Math.min(100, xpProgress)}%` }}></div>
+    );
+
+    return (
+        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-lg shadow-lg relative overflow-hidden">
+             <div className="flex flex-col gap-6">
+                 {/* Header */}
+                 <div className="flex justify-between items-start border-b border-zinc-800 pb-4">
+                     <div>
+                         <h2 className="text-3xl font-bold text-white uppercase tracking-tighter leading-none">{player.name}</h2>
+                         <div className="flex gap-3 mt-2 text-xs">
+                             <span className="text-neon-blue font-bold uppercase tracking-widest px-2 py-0.5 bg-blue-900/20 border border-blue-900/50 rounded">{player.profession}</span>
+                             <span className="text-zinc-400 font-bold uppercase tracking-widest px-2 py-0.5 bg-zinc-800 border border-zinc-700 rounded">{player.faction}</span>
+                             <span className="text-white font-bold uppercase tracking-widest px-2 py-0.5 bg-zinc-800 border border-zinc-700 rounded">LVL {player.level}</span>
+                         </div>
+                     </div>
+                     <div className="text-right">
+                         <div className="text-yellow-400 font-bold text-2xl tracking-wider">${player.wallet.toLocaleString()}</div>
+                         <div className="text-[10px] text-zinc-500 uppercase tracking-widest">GANG TOKENS</div>
+                     </div>
+                 </div>
+
+                 {/* Stats */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     <div>
+                        {renderBar('Health', player.stats.hp, player.stats.maxHp, 'bg-neon-red')}
+                        {renderBar('Energy', player.stats.enr, player.stats.maxEnr, 'bg-yellow-400')}
+                        {renderBar('Stamina', player.stats.sta, player.stats.maxSta, 'bg-green-500')}
+                     </div>
+                     <div>
+                        <div className="grid grid-cols-4 gap-2 h-full items-center">
+                            <div className="text-center p-2 bg-zinc-950/50 border border-zinc-800 rounded">
+                                <div className="text-[10px] text-zinc-500 uppercase mb-1">ATK</div>
+                                <div className="text-white font-bold text-lg">{player.stats.atk}</div>
+                            </div>
+                            <div className="text-center p-2 bg-zinc-950/50 border border-zinc-800 rounded">
+                                <div className="text-[10px] text-zinc-500 uppercase mb-1">DEF</div>
+                                <div className="text-white font-bold text-lg">{player.stats.def}</div>
+                            </div>
+                            <div className="text-center p-2 bg-zinc-950/50 border border-zinc-800 rounded">
+                                <div className="text-[10px] text-zinc-500 uppercase mb-1">LCK</div>
+                                <div className="text-white font-bold text-lg">{player.stats.lck}</div>
+                            </div>
+                            <div className="text-center p-2 bg-zinc-950/50 border border-zinc-800 rounded">
+                                <div className="text-[10px] text-zinc-500 uppercase mb-1">INT</div>
+                                <div className="text-white font-bold text-lg">{player.stats.cInt}</div>
+                            </div>
+                        </div>
+                     </div>
+                 </div>
              </div>
-          </div>
         </div>
-      </div>
-
-      {/* CORE ATTRIBUTES GRID */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-         {attributes.map((attr) => (
-            <div key={attr.code} className="bg-black/40 border border-zinc-800 p-3 rounded flex flex-col justify-between hover:border-zinc-700 transition-colors group">
-                <div className="flex items-start justify-between mb-2">
-                    <div className="w-8 h-8 rounded bg-zinc-900/50 flex items-center justify-center text-lg shadow-inner group-hover:scale-110 transition-transform">
-                        {attr.icon}
-                    </div>
-                    <span className={`text-xl font-bold ${attr.color} tracking-tighter`}>
-                        {attr.code}
-                    </span>
-                </div>
-                <div>
-                    <div className="text-[9px] text-zinc-600 uppercase tracking-wider font-bold mb-0.5">{attr.label}</div>
-                    <div className="text-white text-lg font-mono">{attr.val}</div>
-                </div>
-            </div>
-         ))}
-      </div>
-    </div>
-  );
+    );
 };
 
-// --- REWARD MODAL ---
-interface RewardModalProps {
-  result: DailyRewardResult;
-  onClose: () => void;
-}
+export const DailyRewardsCard: React.FC<DailyRewardsCardProps> = ({ player, onClaim, processing }) => {
+    const isClaimable = player.lastLoginDate !== new Date().toISOString().split('T')[0];
+    const streak = player.loginStreak;
+    const rewards = [50, 75, 100, 'ENR', 150, 'ENR', 300];
+    const dayIndex = (streak) % 7; 
+
+    return (
+        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-lg">
+             <div className="flex justify-between items-center mb-4">
+                 <h3 className="text-sm font-bold text-white uppercase tracking-widest">Daily Login Streak</h3>
+                 <div className="text-xs text-neon-blue font-bold">{streak} DAYS</div>
+             </div>
+
+             <div className="flex justify-between gap-1 mb-4 overflow-x-auto pb-2">
+                 {rewards.map((r, i) => {
+                     const isCurrent = i === dayIndex;
+                     const isPast = i < dayIndex;
+                     return (
+                         <div key={i} className={`flex-1 min-w-[40px] h-12 flex items-center justify-center border text-xs font-bold rounded ${
+                             isCurrent ? 'border-neon-green bg-green-900/20 text-white' :
+                             isPast ? 'border-zinc-700 bg-zinc-800 text-zinc-500' :
+                             'border-zinc-800 bg-black text-zinc-600'
+                         }`}>
+                             {r}
+                         </div>
+                     );
+                 })}
+             </div>
+
+             <button 
+                onClick={onClaim}
+                disabled={!isClaimable || processing}
+                className={`w-full py-2 text-xs font-bold uppercase tracking-widest transition-colors ${
+                    isClaimable && !processing
+                    ? 'bg-neon-green text-black hover:bg-white'
+                    : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                }`}
+             >
+                 {processing ? 'Processing...' : isClaimable ? 'Claim Reward' : 'Come back tomorrow'}
+             </button>
+        </div>
+    );
+};
 
 export const RewardModal: React.FC<RewardModalProps> = ({ result, onClose }) => {
-  return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="bg-zinc-900 border-2 border-neon-green rounded-xl p-8 max-w-sm w-full relative overflow-hidden shadow-[0_0_50px_rgba(0,255,65,0.2)]">
-        {/* Background Effects */}
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, #00ff41 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-neon-green to-transparent"></div>
-        
-        <div className="relative z-10 text-center">
-          <div className="text-neon-green font-bold uppercase tracking-[0.2em] text-sm mb-6 animate-pulse">
-             Supply Drop Secured
-          </div>
+    return (
+        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 animate-in fade-in zoom-in duration-300">
+             <div className="bg-zinc-900 border border-neon-green p-8 rounded-lg max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(0,255,65,0.2)]">
+                 <div className="text-4xl mb-4">🎁</div>
+                 <h2 className="text-2xl font-bold text-white uppercase tracking-widest mb-2">Daily Reward</h2>
+                 <p className="text-zinc-400 mb-6">{result.message}</p>
+                 
+                 <div className="bg-black p-4 rounded mb-6 border border-zinc-800">
+                     {result.reward?.gang && (
+                         <div className="flex justify-between text-sm mb-1">
+                             <span className="text-zinc-500">CREDITS</span>
+                             <span className="text-neon-green font-bold">+${result.reward.gang}</span>
+                         </div>
+                     )}
+                     {result.reward?.energy && (
+                         <div className="flex justify-between text-sm mb-1">
+                             <span className="text-zinc-500">MAX ENERGY</span>
+                             <span className="text-yellow-400 font-bold">+{result.reward.energy}</span>
+                         </div>
+                     )}
+                     {result.reward?.badge && (
+                         <div className="flex justify-between text-sm pt-2 border-t border-zinc-800 mt-2">
+                             <span className="text-zinc-500">BADGE</span>
+                             <span className="text-neon-purple font-bold">{result.reward.badge}</span>
+                         </div>
+                     )}
+                 </div>
 
-          <div className="mb-8 scale-150 transform transition-all duration-500">
-             {result.reward?.gang && <div className="text-5xl mb-2">💵</div>}
-             {result.reward?.energy && <div className="text-5xl mb-2">⚡</div>}
-             {result.reward?.badge && <div className="text-5xl mb-2">🏆</div>}
-          </div>
-
-          <div className="space-y-2 mb-8">
-             {result.reward?.gang && (
-                <div className="text-3xl font-bold text-white tracking-wider animate-in slide-in-from-bottom-2">
-                   +${result.reward.gang}
-                </div>
-             )}
-             {result.reward?.energy && (
-                <div className="text-xl font-bold text-neon-blue tracking-wider animate-in slide-in-from-bottom-4">
-                   MAX ENERGY UPGRADE
-                </div>
-             )}
-             {result.reward?.badge && (
-                <div className="text-lg font-bold text-yellow-400 border border-yellow-500/50 bg-yellow-500/10 px-3 py-1 rounded-full inline-block animate-in zoom-in duration-500">
-                   BADGE UNLOCKED: {result.reward.badge}
-                </div>
-             )}
-          </div>
-
-          <div className="bg-black/40 rounded p-4 mb-6 border border-zinc-800">
-             <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Login Streak</div>
-             <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl font-bold text-white">{result.streak}</span>
-                <span className="text-sm text-zinc-400">DAYS</span>
+                 <button onClick={onClose} className="w-full bg-white text-black font-bold uppercase py-3 hover:bg-zinc-200">
+                     Collect
+                 </button>
              </div>
-             <div className="w-full bg-zinc-800 h-1 mt-2 rounded-full overflow-hidden">
-                <div className="bg-neon-green h-full transition-all duration-1000" style={{ width: `${(result.streak % 7 === 0 ? 7 : result.streak % 7) / 7 * 100}%` }}></div>
-             </div>
-          </div>
-
-          <button 
-             onClick={onClose}
-             className="w-full py-3 bg-neon-green text-black font-bold uppercase tracking-widest rounded hover:bg-white hover:shadow-[0_0_20px_rgba(0,255,65,0.5)] transition-all"
-          >
-             Confirm Receipt
-          </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// --- DAILY REWARDS CARD ---
-interface DailyRewardsCardProps {
-  player: Player;
-  onClaim: () => void;
-  processing: boolean;
-}
-
-export const DailyRewardsCard: React.FC<DailyRewardsCardProps> = ({ player, onClaim, processing }) => {
-  const today = new Date().toISOString().split('T')[0];
-  const isClaimed = player.lastLoginDate === today;
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-  
-  // Calculate visual state
-  let activeDayInCycle = 1; 
-  
-  if (isClaimed) {
-      activeDayInCycle = ((player.loginStreak - 1) % 7) + 1;
-  } else {
-      if (player.lastLoginDate === yesterday) {
-          activeDayInCycle = (player.loginStreak % 7) + 1;
-      } else {
-          // Reset visually implies next is Day 1
-          activeDayInCycle = 1;
-      }
-  }
-
-  const rewards = [
-      { day: 1, label: "$50", icon: "💵" },
-      { day: 2, label: "$75", icon: "💵" },
-      { day: 3, label: "$100", icon: "💵" },
-      { day: 4, label: "+1 ENR", icon: "⚡" },
-      { day: 5, label: "$150", icon: "💵" },
-      { day: 6, label: "+1 ENR", icon: "⚡" },
-      { day: 7, label: "$300 + 🏆", icon: "🎁" },
-  ];
-
-  const hoursRemaining = 24 - new Date().getUTCHours();
-
-  return (
-      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10 font-bold text-6xl text-neon-green select-none pointer-events-none">
-              DAY {activeDayInCycle}
-          </div>
-          
-          <div className="flex justify-between items-end mb-6 relative z-10">
-              <div>
-                  <h3 className="text-white font-bold uppercase tracking-widest text-sm flex items-center gap-2">
-                      <span className="text-neon-green">Daily Supply Drop</span>
-                      {isClaimed && <span className="bg-zinc-800 text-zinc-400 text-[10px] px-2 py-0.5 rounded border border-zinc-700">CLAIMED</span>}
-                  </h3>
-                  <div className="text-xs text-zinc-500 mt-1 flex items-center gap-2">
-                      Current Streak: <span className="text-white font-bold">{player.loginStreak} Days</span>
-                      {!isClaimed && <span className="w-2 h-2 bg-neon-green rounded-full animate-pulse"></span>}
-                  </div>
-              </div>
-              <button
-                  onClick={onClaim}
-                  disabled={isClaimed || processing}
-                  className={`px-6 py-2 text-xs font-bold uppercase rounded tracking-widest transition-all shadow-lg ${
-                      isClaimed 
-                      ? 'bg-zinc-800 text-zinc-600 border border-zinc-700 cursor-not-allowed'
-                      : 'bg-neon-green text-black hover:bg-white hover:shadow-[0_0_20px_rgba(0,255,65,0.6)] animate-pulse'
-                  }`}
-              >
-                  {isClaimed ? `RETURNING IN ${hoursRemaining}H` : 'SECURE PACKAGE'}
-              </button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-2 relative z-10">
-              {rewards.map((r) => {
-                  const isActive = r.day === activeDayInCycle;
-                  const isPast = isClaimed ? r.day <= activeDayInCycle : r.day < activeDayInCycle;
-                  const isReadyToClaim = isActive && !isClaimed;
-                  
-                  return (
-                      <div 
-                          key={r.day} 
-                          className={`
-                              relative border rounded p-2 flex flex-col items-center justify-center min-h-[80px] transition-all duration-300
-                              ${isActive 
-                                  ? `border-neon-green bg-neon-green/10 shadow-[0_0_10px_rgba(0,255,65,0.15)] scale-105 z-10 ${isReadyToClaim ? 'border-2 shadow-[0_0_15px_rgba(0,255,65,0.3)]' : ''}` 
-                                  : isPast 
-                                      ? 'border-zinc-800 bg-zinc-900/50 opacity-40' 
-                                      : 'border-zinc-800 bg-black/40'
-                              }
-                          `}
-                      >
-                          <div className={`text-[10px] absolute top-1 left-2 ${isActive ? 'text-neon-green' : 'text-zinc-600'}`}>0{r.day}</div>
-                          <div className="text-xl mb-1 filter drop-shadow-md">{r.icon}</div>
-                          <div className={`text-[9px] font-bold text-center leading-tight uppercase ${isActive ? 'text-white' : 'text-zinc-500'}`}>
-                              {r.label}
-                          </div>
-                          
-                          {isPast && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded backdrop-blur-[1px]">
-                                  <span className="text-neon-green font-bold text-lg">✓</span>
-                              </div>
-                          )}
-                      </div>
-                  );
-              })}
-          </div>
-      </div>
-  );
-}
-
-// --- MISSION CARD ---
-interface MissionCardProps {
-  mission: Mission;
-  player: Player;
-  onRun: (mission: Mission) => void;
-  cooldownTime: number;
-}
+    );
+};
 
 export const MissionCard: React.FC<MissionCardProps> = ({ mission, player, onRun, cooldownTime }) => {
-  const factors = getMissionFactors(player, mission);
-  const oddsPercent = Math.min(95, Math.max(5, (factors.factors.base * 100 + factors.factors.atk * 100 + factors.factors.def * 100 + factors.factors.crew * 100 + factors.factors.lck * 100 + factors.factors.heat * 100 + factors.factors.skills * 100)));
+  const { factors, estHpLoss, estHeatGain } = getMissionFactors(player, mission);
+  const oddsPercent = Math.min(95, Math.max(5, (factors.base * 100 + factors.atk * 100 + factors.def * 100 + factors.crew * 100 + factors.lck * 100 + factors.heat * 100 + factors.skills * 100)));
   const isLocked = player.level < mission.minLevel;
   const isOnCooldown = cooldownTime > 0;
+  
+  // Mastery Calculation
+  const masteryProgress = player.missionMastery[mission.id] || 0;
+  const isMastered = masteryProgress >= 100;
+  const masteryReward = getMissionMasteryReward(mission);
 
   const formatTime = (ms: number) => {
       const minutes = Math.floor(ms / 60000);
@@ -506,90 +364,189 @@ export const MissionCard: React.FC<MissionCardProps> = ({ mission, player, onRun
       return 'text-neon-red';
   }
 
+  // Stat Caps for Tooltip (Matched with API limits)
+  const isAtkMaxed = factors.atk >= 0.30;
+  const isDefMaxed = factors.def >= 0.20;
+  const isCrewMaxed = factors.crew >= 0.25;
+  const isLuckMaxed = factors.lck >= 0.10;
+
   return (
     <div className={`bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col group transition-all duration-300 hover:border-zinc-500 hover:shadow-xl hover:shadow-neon-blue/10 relative hover:z-50 ${isLocked ? 'opacity-50 grayscale' : ''}`}>
-      {/* HEADER IMAGE AREA */}
-      <div className="h-32 bg-black relative overflow-hidden shrink-0 rounded-t-lg">
-        {mission.imageUrl ? (
-          <img src={mission.imageUrl} alt={mission.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-100" />
-        ) : (
-          <div className="w-full h-full bg-zinc-900 flex flex-col items-center justify-center border-b border-zinc-800">
-             <div className="text-zinc-800 font-bold uppercase tracking-widest text-[10px] mb-1">NO SIGNAL</div>
-             <div className="w-6 h-6 border-2 border-zinc-800 rounded-full border-t-zinc-600 animate-spin opacity-20"></div>
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-80" />
-        
-        {/* Type & Lock Badges */}
-        <div className="absolute top-2 left-2 flex gap-2">
-            <div className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded shadow-md backdrop-blur-sm ${
-                mission.type === MissionType.STORY ? 'bg-yellow-500/80 text-black' : 
-                mission.type === MissionType.CONTRACT ? 'bg-red-500/80 text-white' : 
-                'bg-neon-blue/80 text-black'
+      {/* TEXT HEADER AREA */}
+      <div className="p-4 border-b border-zinc-800 bg-zinc-950/50">
+        <div className="flex justify-between items-start mb-2">
+             <div className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded shadow-md backdrop-blur-sm ${
+                mission.type === MissionType.STORY ? 'bg-yellow-500 text-black' : 
+                mission.type === MissionType.CONTRACT ? 'bg-red-500 text-white' : 
+                'bg-neon-blue text-black'
             }`}>
                 {mission.type.replace('_', ' ')}
             </div>
-            {isLocked && (
-                <div className="px-2 py-0.5 text-[10px] font-bold uppercase rounded shadow-md bg-zinc-900/80 text-zinc-400 border border-zinc-700">
+             {isLocked && (
+                <div className="px-2 py-0.5 text-[10px] font-bold uppercase rounded shadow-md bg-zinc-900 text-zinc-400 border border-zinc-700">
                     LVL {mission.minLevel}
                 </div>
             )}
+            {isMastered && (
+                <div className="absolute top-3 right-3 text-yellow-400 animate-pulse drop-shadow-[0_0_5px_rgba(250,204,21,0.5)] cursor-help" title={`Mastered: ${masteryReward.label}`}>
+                    👑
+                </div>
+            )}
         </div>
+        <h4 className="text-white font-bold text-lg uppercase tracking-wider leading-tight truncate">{mission.title}</h4>
       </div>
 
       {/* CONTENT BODY */}
       <div className="p-4 flex-1 flex flex-col">
-        <h4 className="text-white font-bold text-sm uppercase tracking-wider leading-tight mb-2 truncate">{mission.title}</h4>
         
-        <p className="text-xs text-zinc-400 line-clamp-2 mb-4 flex-1 leading-relaxed min-h-[2.5em]">{mission.description}</p>
+        <p className="text-xs text-zinc-400 line-clamp-2 mb-2 flex-1 leading-relaxed min-h-[3em]">{mission.description}</p>
+        
+        {/* Objectives Preview */}
+        {mission.objectives && mission.objectives.length > 0 && (
+            <div className="mb-4 bg-black/20 p-2 rounded border border-zinc-800/50">
+                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1 flex items-center gap-1">
+                    <span>🎯</span> Objectives
+                </div>
+                <ul className="text-[10px] text-zinc-400 space-y-0.5">
+                    {mission.objectives.slice(0, 2).map((obj, i) => (
+                        <li key={i} className="truncate flex gap-1">
+                            <span className="text-zinc-600">›</span> {obj}
+                        </li>
+                    ))}
+                    {mission.objectives.length > 2 && <li className="text-zinc-600 italic pl-2">+ {mission.objectives.length - 2} more</li>}
+                </ul>
+            </div>
+        )}
         
         {/* REFINED STATS GRID (2x2) */}
         <div className="grid grid-cols-2 gap-px bg-zinc-800/50 border border-zinc-800 rounded mb-4">
             {/* Energy */}
-            <div className="bg-zinc-900/40 p-2 flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors rounded-tl">
+            <div className="bg-zinc-900/40 p-2 flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors rounded-tl border-r border-b border-zinc-800/50">
                 <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Energy</span>
                 <span className="text-neon-blue font-bold text-sm">-{mission.costEnr} ⚡</span>
             </div>
             {/* Payout */}
-            <div className="bg-zinc-900/40 p-2 flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors rounded-tr">
+            <div className="bg-zinc-900/40 p-2 flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors rounded-tr border-b border-zinc-800/50">
                 <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Payout</span>
-                <span className="text-neon-green font-bold text-sm">${mission.baseReward}</span>
+                <span className="text-neon-green font-bold text-sm">
+                    ${isMastered ? Math.floor(mission.baseReward * 1.25) : mission.baseReward}
+                    {isMastered && <span className="text-[9px] align-top text-yellow-400 ml-0.5">*</span>}
+                </span>
             </div>
             {/* Odds with Tooltip */}
-            <div className="bg-zinc-900/40 p-2 flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors relative group/tooltip cursor-help rounded-bl">
-                <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Success</span>
+            <div className="bg-zinc-900/40 p-2 flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors relative group/tooltip cursor-help rounded-bl border-r border-zinc-800/50">
+                <span className="text-[9px] text-zinc-500 uppercase tracking-wider border-b border-dotted border-zinc-600 pb-0.5 mb-1">Success</span>
                 <span className={`font-bold text-sm ${getOddsColor(oddsPercent)}`}>{oddsPercent.toFixed(0)}%</span>
                 
                 {/* TOOLTIP */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-zinc-950 border border-zinc-700 p-3 rounded shadow-[0_0_15px_rgba(0,0,0,0.5)] opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-[100] backdrop-blur-md">
-                    <div className="text-[10px] uppercase font-bold text-zinc-400 mb-2 border-b border-zinc-800 pb-1 text-center">Success Factors</div>
-                    <div className="space-y-1 text-[10px]">
-                        <div className="flex justify-between"><span>Base Chance</span> <span className="text-zinc-300">{(factors.factors.base * 100).toFixed(0)}%</span></div>
-                        {factors.factors.atk > 0 && <div className="flex justify-between"><span>Attack Bonus</span> <span className="text-neon-red">+{(factors.factors.atk * 100).toFixed(0)}%</span></div>}
-                        {factors.factors.def > 0 && <div className="flex justify-between"><span>Defense Bonus</span> <span className="text-neon-blue">+{(factors.factors.def * 100).toFixed(0)}%</span></div>}
-                        {factors.factors.crew > 0 && <div className="flex justify-between"><span>Crew Bonus</span> <span className="text-neon-purple">+{(factors.factors.crew * 100).toFixed(0)}%</span></div>}
-                        {factors.factors.lck > 0 && <div className="flex justify-between"><span>Luck Bonus</span> <span className="text-yellow-500">+{(factors.factors.lck * 100).toFixed(0)}%</span></div>}
-                        {factors.factors.heat !== 0 && <div className="flex justify-between"><span>Heat Penalty</span> <span className="text-red-500">{(factors.factors.heat * 100).toFixed(0)}%</span></div>}
-                        {factors.factors.skills !== 0 && (
-                            <div className="flex justify-between"><span>Skills</span> <span className="text-neon-green">{factors.factors.skills > 0 ? '+' : ''}{(factors.factors.skills * 100).toFixed(0)}%</span></div>
+                <div className="absolute bottom-full left-0 mb-2 w-72 bg-zinc-950 border border-zinc-700 rounded shadow-2xl opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-50 backdrop-blur-md scale-95 group-hover/tooltip:scale-100 origin-bottom duration-200">
+                    <div className="bg-zinc-900/80 p-2 border-b border-zinc-800 rounded-t">
+                        <div className="text-[10px] uppercase font-bold text-white tracking-widest text-center">Success Probability Breakdown</div>
+                    </div>
+                    <div className="p-3 space-y-1.5 text-[10px]">
+                        <div className="flex justify-between text-zinc-300 border-b border-zinc-800/30 pb-1">
+                            <span>Base Chance</span> 
+                            <span className="font-mono text-zinc-400">{(factors.base * 100).toFixed(0)}%</span>
+                        </div>
+                        
+                        {factors.atk > 0 && (
+                            <div className="flex justify-between text-neon-red">
+                                <span>⚔️ ATK Factor {isAtkMaxed && <span className="text-[8px] bg-red-900/50 px-1 rounded ml-1">MAX</span>}</span> 
+                                <span className="font-mono">+{(factors.atk * 100).toFixed(0)}%</span>
+                            </div>
                         )}
-                         <div className="mt-1 pt-1 border-t border-zinc-800 flex justify-between font-bold"><span>Total</span> <span className={getOddsColor(oddsPercent)}>{oddsPercent.toFixed(0)}%</span></div>
+                        {factors.def > 0 && (
+                            <div className="flex justify-between text-neon-blue">
+                                <span>🛡️ DEF Factor {isDefMaxed && <span className="text-[8px] bg-blue-900/50 px-1 rounded ml-1">MAX</span>}</span> 
+                                <span className="font-mono">+{(factors.def * 100).toFixed(0)}%</span>
+                            </div>
+                        )}
+                        {factors.crew > 0 && (
+                            <div className="flex justify-between text-neon-purple">
+                                <span>👥 Crew Factor {isCrewMaxed && <span className="text-[8px] bg-purple-900/50 px-1 rounded ml-1">MAX</span>}</span> 
+                                <span className="font-mono">+{(factors.crew * 100).toFixed(0)}%</span>
+                            </div>
+                        )}
+                        {factors.lck > 0 && (
+                            <div className="flex justify-between text-yellow-400">
+                                <span>🍀 Luck Factor {isLuckMaxed && <span className="text-[8px] bg-yellow-900/50 px-1 rounded ml-1">MAX</span>}</span> 
+                                <span className="font-mono">+{(factors.lck * 100).toFixed(0)}%</span>
+                            </div>
+                        )}
+                        {factors.skills > 0 && (
+                            <div className="flex justify-between text-neon-green">
+                                <span>🧠 Skill Bonuses</span> 
+                                <span className="font-mono">+{(factors.skills * 100).toFixed(0)}%</span>
+                            </div>
+                        )}
+                        
+                        {factors.heat !== 0 && (
+                            <div className="flex justify-between text-red-500 border-t border-zinc-800/50 pt-1 mt-1">
+                                <span>🔥 Heat Penalty</span> 
+                                <span className="font-mono">{(factors.heat * 100).toFixed(0)}%</span>
+                            </div>
+                        )}
+                        
+                         <div className="mt-2 pt-2 border-t border-zinc-700 flex justify-between font-bold text-white bg-black/20 -mx-3 -mb-3 p-3 rounded-b">
+                             <span>TOTAL ODDS</span> 
+                             <span className={`${getOddsColor(oddsPercent)} text-sm`}>{oddsPercent.toFixed(0)}%</span>
+                         </div>
                     </div>
                 </div>
             </div>
             {/* Risk with Tooltip */}
             <div className="bg-zinc-900/40 p-2 flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors relative group/tooltip-risk cursor-help rounded-br">
-                <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Risk</span>
+                <span className="text-[9px] text-zinc-500 uppercase tracking-wider border-b border-dotted border-zinc-600 pb-0.5 mb-1">Risk</span>
                 <span className={`font-bold text-sm ${getRiskColor(mission.risk)}`}>{mission.risk}</span>
 
                 {/* RISK TOOLTIP */}
-                <div className="absolute bottom-full right-0 mb-2 w-40 bg-zinc-950 border border-zinc-700 p-3 rounded shadow-[0_0_15px_rgba(0,0,0,0.5)] opacity-0 group-hover/tooltip-risk:opacity-100 transition-opacity pointer-events-none z-[100] backdrop-blur-md">
-                     <div className="text-[10px] uppercase font-bold text-zinc-400 mb-2 border-b border-zinc-800 pb-1 text-right">Failure Penalties</div>
-                     <div className="space-y-1 text-[10px]">
-                        <div className="flex justify-between"><span>HP Loss</span> <span className="text-red-500">~{factors.estHpLoss}</span></div>
-                        <div className="flex justify-between"><span>Heat Gain</span> <span className="text-orange-500">+{factors.estHeatGain}</span></div>
-                        <div className="text-[9px] text-zinc-500 italic mt-1 text-right">Only applied on failure</div>
+                <div className="absolute bottom-full right-0 mb-2 w-64 bg-zinc-950 border border-red-900/30 rounded shadow-2xl opacity-0 group-hover/tooltip-risk:opacity-100 transition-opacity pointer-events-none z-50 backdrop-blur-md scale-95 group-hover/tooltip-risk:scale-100 origin-bottom duration-200">
+                     <div className="bg-red-950/20 p-2 border-b border-red-900/30 rounded-t">
+                        <div className="text-[10px] uppercase font-bold text-red-500 tracking-widest text-center">Failure Consequences</div>
                      </div>
+                     <div className="p-3 space-y-2 text-[10px]">
+                        <div className="flex justify-between items-center bg-black/40 p-1.5 rounded border border-red-900/20">
+                            <span className="text-zinc-400">Est. Damage</span> 
+                            <span className="text-red-500 font-bold">-{estHpLoss} HP</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-black/40 p-1.5 rounded border border-orange-900/20">
+                            <span className="text-zinc-400">Heat Spike</span> 
+                            <span className="text-orange-500 font-bold">+{estHeatGain} HEAT</span>
+                        </div>
+                        <div className="text-[9px] text-zinc-600 italic mt-1 text-center">
+                            "Consequences are only for those who fail."
+                        </div>
+                     </div>
+                </div>
+            </div>
+        </div>
+
+        {/* MASTERY BAR */}
+        <div className="mb-4 group/mastery relative cursor-help">
+            <div className="flex justify-between text-[9px] uppercase font-bold tracking-wider mb-1">
+                <span className={isMastered ? "text-yellow-400" : "text-zinc-500"}>{isMastered ? "Mastered" : "Mastery"}</span>
+                <span className={isMastered ? "text-yellow-400" : "text-zinc-500"}>{masteryProgress}/100</span>
+            </div>
+            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden relative">
+                <div className={`h-full transition-all duration-500 ${isMastered ? 'bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]' : 'bg-zinc-600'}`} style={{ width: `${masteryProgress}%` }}></div>
+                {/* Reward Indicator Ticks */}
+                <div className="absolute top-0 right-0 w-0.5 h-full bg-white/20"></div>
+            </div>
+            
+            {/* MASTERY TOOLTIP */}
+            <div className="absolute bottom-full left-0 mb-2 w-full bg-zinc-950 border border-zinc-700 p-2 rounded shadow opacity-0 group-hover/mastery:opacity-100 transition-opacity pointer-events-none z-50">
+                <div className="text-[10px] text-center">
+                    {isMastered ? (
+                        <>
+                            <div className="text-yellow-400 font-bold mb-1">UNLOCKED: {masteryReward.label}</div>
+                            <div className="text-zinc-400">Passive Bonus: +25% Cash & XP</div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="text-zinc-300 font-bold mb-1">Reward: {masteryReward.label}</div>
+                            <div className="text-zinc-500">Reach 100% to permanently unlock stats & bonus.</div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
@@ -616,11 +573,6 @@ export const MissionCard: React.FC<MissionCardProps> = ({ mission, player, onRun
   );
 };
 
-// --- MISSION GRID ---
-interface MissionGridProps {
-  children: React.ReactNode;
-}
-
 export const MissionGrid: React.FC<MissionGridProps> = ({ children }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-4">
@@ -629,17 +581,11 @@ export const MissionGrid: React.FC<MissionGridProps> = ({ children }) => {
   );
 };
 
-// --- ACTIVE MISSION SCREEN ---
-interface ActiveMissionProps {
-  mission: Mission;
-  runId: string;
-  onResolve: (decisionId?: string) => void;
-}
-
 export const ActiveMission: React.FC<ActiveMissionProps> = ({ mission, runId, onResolve }) => {
   const [phase, setPhase] = useState<'LOADING' | 'DECISION' | 'EXECUTING'>('LOADING');
   const [narrative, setNarrative] = useState<string>('');
   const [choices, setChoices] = useState<MissionDecision[]>([]);
+  const [dynamicObjectives, setDynamicObjectives] = useState<string[]>([]);
 
   useEffect(() => {
       const loadScenario = async () => {
@@ -649,6 +595,11 @@ export const ActiveMission: React.FC<ActiveMissionProps> = ({ mission, runId, on
           if (res.success && res.data) {
               setNarrative(res.data.narrative);
               setChoices(res.data.choices);
+              if (res.data.objectives) {
+                  setDynamicObjectives(res.data.objectives);
+              } else {
+                  setDynamicObjectives(mission.objectives);
+              }
               setPhase('DECISION');
           } else {
               // Fallback to auto-resolve if data fails
@@ -662,6 +613,8 @@ export const ActiveMission: React.FC<ActiveMissionProps> = ({ mission, runId, on
       setPhase('EXECUTING');
       onResolve(choiceId);
   }
+
+  const objectivesToDisplay = dynamicObjectives.length > 0 ? dynamicObjectives : mission.objectives;
 
   if (phase === 'LOADING') {
       return (
@@ -693,27 +646,30 @@ export const ActiveMission: React.FC<ActiveMissionProps> = ({ mission, runId, on
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-4 animate-in fade-in duration-500 overflow-y-auto">
-      <div className="max-w-3xl w-full bg-zinc-900/90 border border-zinc-700 rounded-xl overflow-hidden shadow-2xl relative backdrop-blur-md">
-         
-         {/* Background Image with Overlay */}
-         <div className="absolute inset-0 z-0">
-             {mission.imageUrl ? (
-                 <img src={mission.imageUrl} className="w-full h-full object-cover opacity-20 grayscale" />
-             ) : (
-                 <div className="w-full h-full bg-black opacity-80" />
-             )}
-             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/80 to-black" />
-         </div>
-
-         <div className="relative z-10 p-8">
+      <div className="max-w-3xl w-full bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden shadow-2xl relative">
+         <div className="p-8">
             <div className="text-center mb-8">
                 <div className="text-neon-blue text-xs uppercase tracking-[0.3em] font-bold mb-2">Tactical Decision Required</div>
                 <h2 className="text-3xl text-white font-bold uppercase tracking-widest mb-4">{mission.title}</h2>
-                <div className="bg-black/60 border border-zinc-800 p-6 rounded-lg text-left">
-                    <p className="text-zinc-300 font-mono leading-relaxed text-sm md:text-base">
-                        <span className="text-neon-blue mr-2">{'>'}</span>
+                <div className="bg-black border border-zinc-800 p-6 rounded-lg text-left shadow-inner">
+                    <p className="text-zinc-300 font-mono leading-relaxed text-sm md:text-base border-l-2 border-neon-blue pl-4">
                         {narrative}
                     </p>
+                    
+                    {/* OBJECTIVES LIST */}
+                    {objectivesToDisplay && objectivesToDisplay.length > 0 && (
+                        <div className="mt-6 border-t border-zinc-800 pt-4">
+                            <h4 className="text-zinc-500 text-[10px] uppercase tracking-[0.2em] mb-3 font-bold">Mission Objectives</h4>
+                            <ul className="space-y-2">
+                                {objectivesToDisplay.map((obj, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-sm text-zinc-300">
+                                        <div className="w-1.5 h-1.5 bg-neon-blue rounded-full"></div>
+                                        <span className="font-mono">{obj}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -758,37 +714,38 @@ export const ActiveMission: React.FC<ActiveMissionProps> = ({ mission, runId, on
   );
 };
 
-// --- RESULT SCREEN ---
-interface MissionResultProps {
-  result: MissionOutcome;
-  mission: Mission;
-  onClose: () => void;
-}
-
 export const MissionResult: React.FC<MissionResultProps> = ({ result, mission, onClose }) => {
   return (
     <div className="flex flex-col items-center justify-center h-full p-4 animate-in fade-in zoom-in duration-300">
       <div className="max-w-md w-full bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden shadow-2xl relative">
-         <div className={`h-48 relative ${result.success ? 'border-b-4 border-neon-green' : 'border-b-4 border-red-500'}`}>
-            {mission.imageUrl ? (
-                <img src={mission.imageUrl} className={`w-full h-full object-cover ${!result.success && 'grayscale contrast-125'}`} />
-            ) : (
-                <div className="w-full h-full bg-black flex items-center justify-center text-zinc-800 font-bold uppercase tracking-widest">
-                   PROCESSING IMAGE
-                </div>
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90" />
-            <div className="absolute bottom-4 left-0 w-full text-center">
-                <h2 className={`text-3xl font-bold tracking-widest uppercase drop-shadow-lg ${result.success ? 'text-neon-green' : 'text-red-500'}`}>
-                    {result.success ? 'MISSION SUCCESS' : 'MISSION FAILED'}
-                </h2>
-            </div>
+         <div className={`p-8 border-b border-zinc-800 ${result.success ? 'bg-green-950/20' : 'bg-red-950/20'}`}>
+            <h2 className={`text-3xl font-bold tracking-widest uppercase text-center ${result.success ? 'text-neon-green' : 'text-red-500'}`}>
+                {result.success ? 'MISSION SUCCESS' : 'MISSION FAILED'}
+            </h2>
          </div>
 
          <div className="p-6">
-            <p className="text-sm text-zinc-300 italic text-center mb-6 leading-relaxed">
+            <p className="text-sm text-zinc-300 italic text-center mb-6 leading-relaxed border-l-2 border-zinc-700 pl-4 py-2">
                 "{result.narrative}"
             </p>
+
+            {result.objectives && result.objectives.length > 0 && (
+                <div className="mb-6 bg-black/40 border border-zinc-800/50 rounded p-3">
+                    <div className="text-[10px] uppercase text-zinc-500 mb-2 font-bold tracking-widest">Objectives Status</div>
+                    <ul className="space-y-1">
+                        {result.objectives.map((obj, i) => (
+                            <li key={i} className="flex items-center gap-2 text-xs">
+                                <span className={result.success ? "text-neon-green" : "text-red-500"}>
+                                    {result.success ? "✓" : "✕"}
+                                </span>
+                                <span className={result.success ? "text-zinc-300" : "text-zinc-500 line-through"}>
+                                    {obj}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-black/50 p-3 rounded border border-zinc-800 text-center">
