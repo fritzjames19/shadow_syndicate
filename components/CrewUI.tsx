@@ -168,9 +168,9 @@ export const CrewUI: React.FC<CrewUIProps> = ({ player, onUpdate, onLog }) => {
        ) : (
          <div className="grid grid-cols-1 gap-3">
             {player.crew.map((member) => (
-              <div key={member.id} className={`flex items-center justify-between p-4 border rounded transition-all ${member.isActive ? 'bg-zinc-900 border-zinc-700' : 'bg-black border-zinc-900 opacity-60'}`}>
-                  <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 flex items-center justify-center rounded bg-black border ${member.isActive ? 'border-zinc-600 text-white' : 'border-zinc-800 text-zinc-700'}`}>
+              <div key={member.id} className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 border rounded transition-all gap-4 ${member.isActive ? 'bg-zinc-900 border-zinc-700' : 'bg-black border-zinc-900 opacity-60'}`}>
+                  <div className="flex items-center gap-4 w-full md:w-auto">
+                      <div className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded bg-black border ${member.isActive ? 'border-zinc-600 text-white' : 'border-zinc-800 text-zinc-700'}`}>
                           {member.type === 'Thug' ? '👊' : member.type === 'Soldier' ? '🔫' : '🛡️'}
                       </div>
                       <div>
@@ -184,12 +184,16 @@ export const CrewUI: React.FC<CrewUIProps> = ({ player, onUpdate, onLog }) => {
                           {/* Trait Badge */}
                           {member.trait && (
                             <div className="mt-2 group relative inline-block cursor-help">
-                                <span className="text-[9px] font-bold uppercase bg-white/10 text-white px-2 py-0.5 rounded border border-white/20">
+                                <span className="text-[9px] font-bold uppercase bg-white/10 text-white px-2 py-0.5 rounded border border-white/20 hover:border-white hover:bg-white/20 transition-colors">
                                     {member.trait}
                                 </span>
                                 {/* Tooltip */}
-                                <div className="absolute left-0 bottom-full mb-1 w-48 bg-zinc-950 border border-zinc-700 p-2 text-[10px] text-zinc-300 rounded shadow-xl hidden group-hover:block z-10">
-                                    {member.traitDescription || "Special trait effects."}
+                                <div className="absolute left-0 bottom-full mb-2 w-48 bg-zinc-950 border border-zinc-700 p-2 rounded shadow-xl hidden group-hover:block z-50 pointer-events-none">
+                                    <div className="text-[10px] text-zinc-400 font-bold uppercase mb-1">Trait Effect</div>
+                                    <div className="text-[10px] text-zinc-300">
+                                        {member.traitDescription || "Special trait effects."}
+                                    </div>
+                                    <div className="absolute bottom-0 left-4 w-2 h-2 bg-zinc-950 border-r border-b border-zinc-700 transform rotate-45 translate-y-1/2"></div>
                                 </div>
                             </div>
                           )}
@@ -199,7 +203,7 @@ export const CrewUI: React.FC<CrewUIProps> = ({ player, onUpdate, onLog }) => {
                   <button 
                     onClick={() => handleToggle(member.id)}
                     disabled={!!processing}
-                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest rounded border transition-colors min-w-[100px] ${
+                    className={`w-full md:w-auto px-4 py-2 text-[10px] font-bold uppercase tracking-widest rounded border transition-colors min-w-[100px] ${
                         member.isActive 
                         ? 'bg-green-900/20 text-green-500 border-green-900 hover:bg-green-900/40' 
                         : 'bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-zinc-300'
@@ -216,21 +220,21 @@ export const CrewUI: React.FC<CrewUIProps> = ({ player, onUpdate, onLog }) => {
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-6 border-b border-zinc-800 pb-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b border-zinc-800 pb-4 gap-4">
             <div>
-                <h2 className="text-2xl text-white font-bold uppercase tracking-widest">Syndicate Crew</h2>
+                <h2 className="text-xl md:text-2xl text-white font-bold uppercase tracking-widest">Syndicate Crew</h2>
                 <div className="text-xs text-zinc-500 mt-1">Manage your organization's manpower.</div>
             </div>
-            <div className="flex gap-2 mt-4 md:mt-0">
+            <div className="flex gap-2 w-full md:w-auto">
                 <button 
                     onClick={() => setActiveTab('ROSTER')}
-                    className={`px-6 py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors ${activeTab === 'ROSTER' ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-500 hover:text-white'}`}
+                    className={`flex-1 md:flex-none px-6 py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors ${activeTab === 'ROSTER' ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-500 hover:text-white'}`}
                 >
                     Roster ({player.crew.length})
                 </button>
                 <button 
                     onClick={() => setActiveTab('RECRUIT')}
-                    className={`px-6 py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors ${activeTab === 'RECRUIT' ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-500 hover:text-white'}`}
+                    className={`flex-1 md:flex-none px-6 py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors ${activeTab === 'RECRUIT' ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-500 hover:text-white'}`}
                 >
                     Recruitment
                 </button>

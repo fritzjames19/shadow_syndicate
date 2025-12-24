@@ -342,6 +342,11 @@ export const MissionCard: React.FC<MissionCardProps> = ({ mission, player, onRun
   const isMastered = masteryProgress >= 100;
   const masteryReward = getMissionMasteryReward(mission);
 
+  // Crew Traits Analysis
+  const activeCrew = player.crew.filter(c => c.isActive);
+  const corpoCount = activeCrew.filter(c => c.trait === 'Ex-Corpo').length;
+  const psychoCount = activeCrew.filter(c => c.trait === 'Psycho').length;
+
   const formatTime = (ms: number) => {
       const minutes = Math.floor(ms / 60000);
       const seconds = Math.floor((ms % 60000) / 1000);
@@ -435,7 +440,10 @@ export const MissionCard: React.FC<MissionCardProps> = ({ mission, player, onRun
             </div>
             {/* Odds with Tooltip */}
             <div className="bg-zinc-900/40 p-2 flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors relative group/tooltip cursor-help rounded-bl border-r border-zinc-800/50">
-                <span className="text-[9px] text-zinc-500 uppercase tracking-wider border-b border-dotted border-zinc-600 pb-0.5 mb-1">Success</span>
+                <div className="flex items-center justify-center gap-1 border-b border-dotted border-zinc-600 pb-0.5 mb-1">
+                    <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Success</span>
+                    <span className="text-[8px] text-zinc-600">ⓘ</span>
+                </div>
                 <span className={`font-bold text-sm ${getOddsColor(oddsPercent)}`}>{oddsPercent.toFixed(0)}%</span>
                 
                 {/* TOOLTIP */}
@@ -496,7 +504,10 @@ export const MissionCard: React.FC<MissionCardProps> = ({ mission, player, onRun
             </div>
             {/* Risk with Tooltip */}
             <div className="bg-zinc-900/40 p-2 flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors relative group/tooltip-risk cursor-help rounded-br">
-                <span className="text-[9px] text-zinc-500 uppercase tracking-wider border-b border-dotted border-zinc-600 pb-0.5 mb-1">Risk</span>
+                <div className="flex items-center justify-center gap-1 border-b border-dotted border-zinc-600 pb-0.5 mb-1">
+                    <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Risk</span>
+                    <span className="text-[8px] text-zinc-600">ⓘ</span>
+                </div>
                 <span className={`font-bold text-sm ${getRiskColor(mission.risk)}`}>{mission.risk}</span>
 
                 {/* RISK TOOLTIP */}
@@ -513,7 +524,26 @@ export const MissionCard: React.FC<MissionCardProps> = ({ mission, player, onRun
                             <span className="text-zinc-400">Heat Spike</span> 
                             <span className="text-orange-500 font-bold">+{estHeatGain} HEAT</span>
                         </div>
-                        <div className="text-[9px] text-zinc-600 italic mt-1 text-center">
+                        
+                        {(corpoCount > 0 || psychoCount > 0) && (
+                            <div className="border-t border-red-900/20 pt-2 mt-1">
+                                <div className="text-[9px] text-zinc-500 uppercase mb-1">Crew Traits Active</div>
+                                {corpoCount > 0 && (
+                                    <div className="flex justify-between text-green-500">
+                                        <span>Ex-Corpo ({corpoCount})</span>
+                                        <span>Reducing Heat</span>
+                                    </div>
+                                )}
+                                {psychoCount > 0 && (
+                                    <div className="flex justify-between text-red-400">
+                                        <span>Psycho ({psychoCount})</span>
+                                        <span>Increasing Heat</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="text-[9px] text-zinc-600 italic mt-1 text-center border-t border-zinc-800/30 pt-2">
                             "Consequences are only for those who fail."
                         </div>
                      </div>
@@ -662,8 +692,8 @@ export const ActiveMission: React.FC<ActiveMissionProps> = ({ mission, runId, on
                             <h4 className="text-zinc-500 text-[10px] uppercase tracking-[0.2em] mb-3 font-bold">Mission Objectives</h4>
                             <ul className="space-y-2">
                                 {objectivesToDisplay.map((obj, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-sm text-zinc-300">
-                                        <div className="w-1.5 h-1.5 bg-neon-blue rounded-full"></div>
+                                    <li key={i} className="flex items-center gap-3 text-sm text-zinc-300 animate-in fade-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${i * 150}ms` }}>
+                                        <div className="w-1.5 h-1.5 bg-neon-blue rounded-full shadow-[0_0_5px_rgba(0,243,255,0.8)]"></div>
                                         <span className="font-mono">{obj}</span>
                                     </li>
                                 ))}

@@ -130,9 +130,15 @@ export interface Player {
   missionMastery: Record<string, number>;
   
   currentNews: string;
+  
+  // Daily Reward System
   loginStreak: number;
-  lastLoginDate: string;
+  lastLoginDate: string; // ISO Date "YYYY-MM-DD"
   badges: string[];
+
+  // Social / System
+  redeemedCodes: string[];
+  
   portraitUrl?: string;
 }
 
@@ -165,10 +171,6 @@ export interface Mission {
   costEnr: number;
   baseReward: number;
   baseXp: number;
-  /**
-   * Specific tactical goals for the mission.
-   * Required for AI narrative generation to describe specific actions.
-   */
   objectives: string[];
   baseSuccessChance: number;
   imageUrl?: string;
@@ -182,9 +184,10 @@ export interface DistrictMeta {
 }
 
 export interface SkillEffect {
-  type: 'STAT_FLAT' | 'MISSION_BONUS';
+  type: 'STAT_FLAT' | 'MISSION_BONUS' | 'COMBAT_ABILITY';
   target: string;
   value: number;
+  cooldown?: number;
 }
 
 export interface Skill {
@@ -212,7 +215,7 @@ export interface Enemy {
 export interface CombatLog {
     turn: number;
     message: string;
-    type: 'PLAYER_HIT' | 'ENEMY_HIT' | 'INFO' | 'FAILURE';
+    type: 'PLAYER_HIT' | 'ENEMY_HIT' | 'INFO' | 'FAILURE' | 'ABILITY';
     damage?: number;
 }
 
@@ -222,6 +225,8 @@ export interface CombatState {
     enemy: Enemy;
     logs: CombatLog[];
     playerDefending: boolean;
+    activeEffects: Record<string, number>;
+    abilityCooldowns: Record<string, number>;
 }
 
 export interface MissionRun {

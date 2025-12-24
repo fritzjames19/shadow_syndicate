@@ -90,7 +90,6 @@ const ENEMY_DATABASE: Omit<Enemy, 'id'>[] = [
     { name: 'Street Thug', hp: 50, maxHp: 50, atk: 10, def: 0, type: 'HUMAN' },
 ];
 
-// NEW: Crew Traits
 const CREW_TRAITS = [
     { name: 'Trigger Happy', desc: '+5 ATK, -2 DEF', atk: 5, def: -2, costMult: 1 },
     { name: 'Meat Shield', desc: '+10 DEF, -2 ATK', atk: -2, def: 10, costMult: 1 },
@@ -198,12 +197,32 @@ export const getBaseHeatForRisk = (risk: string) => {
     }
 };
 
+/**
+ * MATH FIX: Diminishing Returns Formula
+ * calculateContribution(currentValue, maxContribution, halfWayPoint)
+ * returns a float between 0 and maxContribution.
+ */
+const calculateContribution = (val: number, max: number, halfWay: number) => {
+    return max * (val / (val + halfWay));
+};
+
 export const getMissionFactors = (player: Player, mission: Mission) => {
   const totals = calculateTotalStats(player);
-  const atkFactor = clamp(totals.atk / 100, 0, 0.30);
-  const defFactor = clamp(totals.def / 120, 0, 0.20);
-  const crewFactor = clamp(totals.crewPower / 150, 0, 0.25);
-  const luckFactor = clamp(player.stats.lck / 200, 0, 0.10);
+
+  // REVISED: Rational Function Diminishing Returns
+  // ATK: Max 35%, Halfway at 150 ATK. (50 ATK = 8.7%, 300 ATK = 23%, 1000 ATK = 30%)
+  const atkFactor = calculateContribution(totals.atk, 0.35, 150);
+  
+  // DEF: Max 25%, Halfway at 150 DEF.
+  const defFactor = calculateContribution(totals.def, 0.25, 150);
+  
+  // CREW: Max 25%, Halfway at 200 Power.
+  const crewFactor = calculateContribution(totals.crewPower, 0.25, 200);
+  
+  // LUCK: Max 15%, Halfway at 30 Luck.
+  const luckFactor = calculateContribution(player.stats.lck, 0.15, 30);
+  
+  // Heat Penalty: Linear up to -30%
   const heatPenalty = clamp(player.stats.heat / 200, 0, 0.30);
 
   let skillBonus = 0;
@@ -215,17 +234,25 @@ export const getMissionFactors = (player: Player, mission: Mission) => {
   });
 
   const baseChance = mission.baseSuccessChance;
-  let estHpLoss = Math.max(1, Math.round((5 + mission.costEnr * 0.8) - (totals.def / 5)));
+  
+  // MATH FIX: Damage Mitigation Formula (Percentage based)
+  // Damage = Base * (100 / (100 + Def))
+  const mitigationMultiplier = 100 / (100 + totals.def);
+  const rawDamage = 15 + (mission.costEnr * 1.5) + (mission.difficulty * 2);
+  let estHpLoss = Math.max(1, Math.round(rawDamage * mitigationMultiplier));
+
   let estHeatGain = 5 + getBaseHeatForRisk(mission.risk);
   if (player.stats.heat > 50) estHeatGain += 5;
   
-  // Apply Crew Traits (Dynamic)
+  // Apply Crew Traits
   player.crew.filter(c => c.isActive).forEach(c => {
+      // @ts-ignore
       if (c.trait === 'Ex-Corpo') {
-          estHeatGain = Math.floor(estHeatGain * 0.95); // 5% reduction per corpo
+          estHeatGain = Math.floor(estHeatGain * 0.95);
       }
+      // @ts-ignore
       if (c.trait === 'Psycho') {
-          estHeatGain += 2; // Increases heat
+          estHeatGain += 2;
       }
   });
   
@@ -263,7 +290,6 @@ export const calculateMissionOdds = (player: Player, mission: Mission, modifiers
   return clamp(total, 0.05, 0.95);
 };
 
-// NEW HELPER: Define mastery rewards centrally
 export const getMissionMasteryReward = (mission: Mission) => {
     if (mission.type === MissionType.STORY) return { type: 'MAX_HP', value: 20, label: 'Titan Heart (+20 Max HP)' };
     if (mission.risk === 'Extreme') return { type: 'ATK', value: 3, label: 'Apex Predator (+3 ATK)' };
@@ -303,13 +329,17 @@ const CREW_TEMPLATES: Record<string, Omit<CrewMember, 'id' | 'isActive' | 'trait
   'Enforcer': { name: 'Enforcer', type: 'Enforcer', atk: 35, def: 10, cost: 10000, upkeep: 50 }
 };
 
-// Generate Enemy Helper
 const spawnEnemy = (mission: Mission, playerLevel: number): Enemy => {
     const templates = ENEMY_DATABASE.filter(e => e.district === mission.district);
-    const template = templates.length > 0 ? templates[Math.floor(Math.random() * templates.length)] : ENEMY_DATABASE[ENEMY_DATABASE.length - 1]; // Fallback to Thug
+    const template = templates.length > 0 ? templates[Math.floor(Math.random() * templates.length)] : ENEMY_DATABASE[ENEMY_DATABASE.length - 1];
     
-    // Scale enemy
-    const scaling = 1 + (playerLevel * 0.1);
+    // MATH FIX: Exponential Scaling for Enemies
+    // Matches the exponential power of Gear tiers.
+    // Level 1: 1.0x
+    // Level 10: ~2.0x
+    // Level 20: ~4.3x
+    // Level 50: ~43x
+    const scaling = Math.pow(1.08, Math.max(0, playerLevel - 1));
     
     return {
         id: crypto.randomUUID(),
@@ -343,7 +373,6 @@ initMarket();
 
 export const api = {
   
-  // ... PLAYER, MARKET, SKILLS, CREW ENDPOINTS (UNCHANGED) ...
   player: {
     create: async (name: string, faction: FactionId, profession: ProfessionId): Promise<ApiResponse<Player>> => {
       const baseStats: PlayerStats = { atk: 10, def: 5, hp: 100, maxHp: 100, enr: 100, maxEnr: 100, sta: 100, maxSta: 100, lck: 5, cInt: 10, heat: 0 };
@@ -356,14 +385,90 @@ export const api = {
           case ProfessionId.SMUGGLER: baseStats.def = Math.round(baseStats.def * 1.15); baseStats.maxSta = Math.round(baseStats.maxSta * 1.30); baseStats.sta = baseStats.maxSta; break;
       }
       const now = Date.now();
-      const newPlayer: Player = { id: crypto.randomUUID(), name, faction, profession, level: 1, xp: 0, stats: baseStats, wallet: 1000, crew: [], day: 1, inventory: [], equipment: { weapon: null, armor: null, gadget: null }, skillPoints: 0, unlockedSkills: [], lastEnergyUpdate: now, lastStaminaUpdate: now, lastHeatUpdate: now, missionCooldowns: {}, missionMastery: {}, currentNews: "Welcome to the shadows. Stay low.", loginStreak: 0, lastLoginDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], badges: [] };
+      const newPlayer: Player = { 
+          id: crypto.randomUUID(), name, faction, profession, level: 1, xp: 0, stats: baseStats, wallet: 1000, crew: [], day: 1, inventory: [], equipment: { weapon: null, armor: null, gadget: null }, 
+          skillPoints: 0, unlockedSkills: [], lastEnergyUpdate: now, lastStaminaUpdate: now, lastHeatUpdate: now, missionCooldowns: {}, missionMastery: {}, currentNews: "Welcome to the shadows. Stay low.", 
+          loginStreak: 0, 
+          lastLoginDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Allow immediate claim
+          badges: [],
+          redeemedCodes: []
+      };
       DB.player = newPlayer; DB.missionRuns = []; DB.heatEvents = []; DB.adminAudit = []; initMarket(); saveState();
       return { success: true, data: newPlayer, message: "Encrypted connection established." };
     },
     getDashboard: async (): Promise<ApiResponse<Player>> => { if (!DB.player) return { success: false, message: "Session expired." }; return { success: true, data: DB.player }; },
     claimDailyReward: async (): Promise<ApiResponse<Player> & { dailyResult: DailyRewardResult }> => { if (!DB.player) return { success: false, message: "Session invalid", dailyResult: { claimed: false, streak: 0, message: "Error" } }; let p = { ...DB.player }; const today = new Date().toISOString().split('T')[0]; if (p.lastLoginDate === today) return { success: true, data: p, dailyResult: { claimed: false, streak: p.loginStreak, message: "Daily reward already claimed today." } }; const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]; if (p.lastLoginDate === yesterday) p.loginStreak += 1; else p.loginStreak = 1; p.lastLoginDate = today; const cycleDay = ((p.loginStreak - 1) % 7) + 1; const result: DailyRewardResult = { claimed: true, streak: p.loginStreak, message: "", reward: {} }; switch(cycleDay) { case 1: p.wallet += 50; result.reward!.gang = 50; result.message = "Login Bonus: +50 $GANG"; break; case 2: p.wallet += 75; result.reward!.gang = 75; result.message = "Login Bonus: +75 $GANG"; break; case 3: p.wallet += 100; result.reward!.gang = 100; result.message = "Login Bonus: +100 $GANG"; break; case 4: p.stats.maxEnr += 1; p.stats.enr = p.stats.maxEnr; result.reward!.energy = 1; result.message = "Login Bonus: +1 MAX ENERGY & REFILL"; break; case 5: p.wallet += 150; result.reward!.gang = 150; result.message = "Login Bonus: +150 $GANG"; break; case 6: p.stats.maxEnr += 1; p.stats.enr = p.stats.maxEnr; result.reward!.energy = 1; result.message = "Login Bonus: +1 MAX ENERGY & REFILL"; break; case 7: p.wallet += 300; result.reward!.gang = 300; if (!p.badges.includes('LOYAL_OPERATIVE')) { p.badges.push('LOYAL_OPERATIVE'); result.reward!.badge = 'LOYAL_OPERATIVE'; result.message = "WEEKLY STREAK: +300 $GANG & 'Loyal Operative' Badge!"; } else { result.message = "WEEKLY STREAK: +300 $GANG"; } break; } DB.player = p; saveState(); return { success: true, data: p, message: result.message, dailyResult: result }; },
-    rest: async (): Promise<ApiResponse<Player>> => { if (!DB.player) return { success: false }; let p = { ...DB.player }; const healAmount = 20; const heatReduction = 5; const stamCost = 10; if (p.stats.sta < stamCost) return { success: false, message: "Not enough Stamina to organize a safehouse rest." }; const oldHeat = p.stats.heat; p.stats.hp = Math.min(p.stats.maxHp, p.stats.hp + healAmount); p.stats.heat = Math.max(0, p.stats.heat - heatReduction); p.stats.sta -= stamCost; if (p.stats.heat !== oldHeat) DB.heatEvents.push({ id: crypto.randomUUID(), playerId: p.id, heatBefore: oldHeat, heatAfter: p.stats.heat, reason: 'REST', narrative: 'Player rested at safehouse.', timestamp: Date.now() }); DB.player = p; saveState(); return { success: true, data: p, message: `Rested at Safehouse. HP +${healAmount}, Heat -${heatReduction} (Cost: ${stamCost} STA).` }; },
-    performMaintenance: async (): Promise<ApiResponse<Player>> => { if (!DB.player) return { success: false }; let p = { ...DB.player }; const dailyUpkeep = p.crew.reduce((sum, c) => sum + c.upkeep, 0) + 50; let paid = false; let penaltyMsg = ""; if (p.wallet >= dailyUpkeep) { p.wallet -= dailyUpkeep; paid = true; } else { p.wallet = 0; if (p.crew.length > 0) { const randomIndex = Math.floor(Math.random() * p.crew.length); const deserter = p.crew[randomIndex]; p.crew.splice(randomIndex, 1); penaltyMsg = ` Couldn't pay upkeep. ${deserter.name} left. ATK penalized.`; } else { penaltyMsg = " Reputation damaged due to missed payments."; } p.stats.atk = Math.max(1, p.stats.atk - 1); } p.day += 1; p.stats.heat = Math.max(0, p.stats.heat - 10); const news = await generateNewsUpdate(p); p.currentNews = news; DB.player = p; const status = paid ? "Daily upkeep paid." : "DEFAULTED ON UPKEEP."; saveState(); return { success: true, data: p, message: `Day ${p.day} Begin. ${status} (-$${dailyUpkeep})${penaltyMsg}` }; },
+    rest: async (): Promise<ApiResponse<Player>> => { 
+        if (!DB.player) return { success: false }; 
+        let p = { ...DB.player }; 
+        
+        // ECONOMY FIX: Rest Cost Scales with Level & Damage
+        const missingHp = p.stats.maxHp - p.stats.hp;
+        const inflation = 1 + (p.level * 0.1);
+        const costMoney = Math.ceil(missingHp * 2 * inflation);
+        const stamCost = 15; // Increased from 10
+        
+        if (p.wallet < costMoney) return { success: false, message: `Insufficient funds for medical treatment. Cost: $${costMoney}` };
+        if (p.stats.sta < stamCost) return { success: false, message: "Not enough Stamina to organize a safehouse rest." }; 
+        
+        const oldHeat = p.stats.heat; 
+        const healAmount = 30; // Better heal
+        
+        p.wallet -= costMoney;
+        p.stats.hp = Math.min(p.stats.maxHp, p.stats.hp + healAmount); 
+        p.stats.heat = Math.max(0, p.stats.heat - 10); // Better heat reduction
+        p.stats.sta -= stamCost; 
+        
+        if (p.stats.heat !== oldHeat) DB.heatEvents.push({ id: crypto.randomUUID(), playerId: p.id, heatBefore: oldHeat, heatAfter: p.stats.heat, reason: 'REST', narrative: 'Player rested at safehouse.', timestamp: Date.now() }); 
+        DB.player = p; 
+        saveState(); 
+        return { success: true, data: p, message: `Safehouse Rest. HP +${healAmount}, Heat -10. (Cost: $${costMoney}, ${stamCost} STA).` }; 
+    },
+    performMaintenance: async (): Promise<ApiResponse<Player>> => { 
+        if (!DB.player) return { success: false }; 
+        let p = { ...DB.player }; 
+        
+        // ECONOMY FIX: Inflationary Upkeep
+        const inflation = 1 + (p.level * 0.1); // +10% cost per player level
+        const baseCost = 50 * inflation;
+        
+        const dailyUpkeep = Math.round(p.crew.reduce((sum, c) => sum + c.upkeep, 0) * inflation + baseCost); 
+        let paid = false; 
+        let penaltyMsg = ""; 
+        
+        if (p.wallet >= dailyUpkeep) { 
+            p.wallet -= dailyUpkeep; 
+            paid = true; 
+        } else { 
+            // FAILURE STATE: Upkeep Default
+            p.wallet = 0; 
+            if (p.crew.length > 0) { 
+                const deserters = p.crew.filter(() => Math.random() > 0.5); // 50% chance for EACH member to leave if unpaid
+                if (deserters.length === 0 && p.crew.length > 0) deserters.push(p.crew[0]); // At least one leaves
+                
+                deserters.forEach(d => {
+                    const idx = p.crew.findIndex(c => c.id === d.id);
+                    if (idx > -1) p.crew.splice(idx, 1);
+                });
+                
+                penaltyMsg = ` Defaulted on payments! ${deserters.length} crew members deserted.`; 
+            } else { 
+                penaltyMsg = " Reputation damaged due to missed payments. Heat increased."; 
+                p.stats.heat += 15;
+            } 
+            p.stats.atk = Math.max(1, p.stats.atk - 2); 
+        } 
+        
+        p.day += 1; 
+        if (paid) p.stats.heat = Math.max(0, p.stats.heat - 15); 
+        
+        const news = await generateNewsUpdate(p); 
+        p.currentNews = news; 
+        DB.player = p; 
+        const status = paid ? "Daily upkeep paid." : "DEFAULTED ON UPKEEP."; 
+        saveState(); 
+        return { success: true, data: p, message: `Day ${p.day} Begin. ${status} (-$${dailyUpkeep})${penaltyMsg}` }; 
+    },
   },
   
   skills: { 
@@ -457,11 +562,9 @@ export const api = {
         const temp = CREW_TEMPLATES[t]; 
         if (!temp) return { success: false, message: "Invalid type" };
         
-        // Random Trait Generation
         const trait = CREW_TRAITS[Math.floor(Math.random() * CREW_TRAITS.length)];
         const modifiedCost = Math.floor(temp.cost * trait.costMult);
         
-        // Re-check cost with modification
         if (DB.player.wallet < modifiedCost) return { success: false, message: `Insufficient funds (Trait Adjustment: ${modifiedCost})` };
 
         DB.player.wallet -= modifiedCost; 
@@ -475,10 +578,8 @@ export const api = {
             id: crypto.randomUUID(), 
             isActive: true, 
             type: t,
-            // Apply immediate flat stat modifiers
             atk: Math.max(0, temp.atk + trait.atk),
             def: Math.max(0, temp.def + trait.def),
-            // Persist the trait name for mission logic and display
             trait: trait.name,
             traitDescription: trait.desc,
             upkeep: finalUpkeep
@@ -498,7 +599,83 @@ export const api = {
     } 
   },
   
-  system: { tick: async () => { if (!DB.player) return { success: false }; if (DB.player.stats.enr < DB.player.stats.maxEnr) { DB.player.stats.enr += 1; saveState(); } return { success: true, data: DB.player }; }, getStaticData: async () => ({ success: true, data: { missions: DB.missions, items: DB.items, districts: DB.districts } }), getPendingMission: async (pid: string) => { const r = DB.missionRuns.find(x => x.playerId === pid && (x.narrative === 'PENDING' || (x.combatState && x.combatState.isActive))); return r ? r.id : null; } },
+  system: { 
+      tick: async () => { if (!DB.player) return { success: false }; if (DB.player.stats.enr < DB.player.stats.maxEnr) { DB.player.stats.enr += 1; saveState(); } return { success: true, data: DB.player }; }, 
+      getStaticData: async () => ({ success: true, data: { missions: DB.missions, items: DB.items, districts: DB.districts } }), 
+      getPendingMission: async (pid: string) => { const r = DB.missionRuns.find(x => x.playerId === pid && (x.narrative === 'PENDING' || (x.combatState && x.combatState.isActive))); return r ? r.id : null; },
+      
+      // CRITICAL SYSTEM: Manual Save Management (Pre-Launch "Wallet")
+      exportSave: async (): Promise<ApiResponse<string>> => {
+          if (!DB.player) return { success: false, message: "No data to export" };
+          const payload = {
+            player: DB.player,
+            missionRuns: DB.missionRuns,
+            heatEvents: DB.heatEvents,
+            market: DB.market,
+          };
+          // Simple Base64 encoding for MVP. 
+          const b64 = btoa(JSON.stringify(payload));
+          return { success: true, data: b64, message: "Save data generated." };
+      },
+      
+      importSave: async (b64: string): Promise<ApiResponse<boolean>> => {
+          try {
+              const raw = atob(b64);
+              const data = JSON.parse(raw);
+              if (!data.player || !data.player.id) return { success: false, message: "Invalid save format." };
+              
+              // Restore to DB
+              DB.player = data.player;
+              DB.missionRuns = data.missionRuns || [];
+              DB.heatEvents = data.heatEvents || [];
+              DB.market = data.market || DB.market;
+              
+              saveState();
+              window.location.reload(); // Hard reload to apply state
+              return { success: true, message: "Import successful. Reloading..." };
+          } catch (e) {
+              return { success: false, message: "Corrupted save string." };
+          }
+      },
+      
+      redeemCode: async (code: string): Promise<ApiResponse<Player>> => {
+          if (!DB.player) return { success: false, message: "Session expired" };
+          const p = DB.player;
+          
+          if (p.redeemedCodes.includes(code)) return { success: false, message: "Code already redeemed." };
+          
+          let valid = false;
+          let msg = "Invalid Code";
+          
+          // HARDCODED PRE-LAUNCH CODES (Safe from API exploits)
+          if (code === 'ALPHA_2024') {
+              p.wallet += 250;
+              msg = "Alpha Access: +250 $GANG";
+              valid = true;
+          } else if (code === 'TWITTER_OP') {
+              if (!p.badges.includes('NETWORK_AGENT')) {
+                  p.badges.push('NETWORK_AGENT');
+                  msg = "Network Agent Badge Unlocked";
+                  valid = true;
+              } else {
+                  msg = "Badge already owned.";
+              }
+          } else if (code === 'WELCOME_TO_THE_SPRAWL') {
+              p.stats.enr = p.stats.maxEnr;
+              p.stats.hp = p.stats.maxHp;
+              msg = "Full Recovery Applied";
+              valid = true;
+          }
+          
+          if (valid) {
+              p.redeemedCodes.push(code);
+              saveState();
+              return { success: true, data: p, message: msg };
+          }
+          
+          return { success: false, message: msg };
+      }
+  },
   admin: { 
       verifyKey: (k: string) => k === 'admin-secret', 
       getOverview: async () => {
@@ -524,7 +701,7 @@ export const api = {
       adjustPlayer: async (k: string, p: any) => { if (k !== 'admin-secret' || !DB.player) return { success: false }; if (p.gangDelta) DB.player.wallet += p.gangDelta; if (p.xpDelta) { DB.player.xp += p.xpDelta; const c = checkLevelUp(DB.player); if (c.leveledUp) DB.player = c.newPlayer; } if (p.resetSave) { localStorage.removeItem(STORAGE_KEY); DB.player = null; window.location.reload(); return { success: true }; } saveState(); return { success: true, data: DB.player }; } 
   },
   
-  // ... MISSIONS + COMBAT (UNCHANGED) ...
+  // ... MISSIONS + COMBAT ...
   missions: {
     start: async (missionId: string): Promise<ApiResponse<{ missionRunId: string }>> => {
        if (!DB.player) return { success: false, message: "Unauthorized" };
@@ -532,6 +709,12 @@ export const api = {
        if (!mission) return { success: false, message: "Mission not found" };
 
        let p = { ...DB.player };
+       
+       // FAILURE STATE FIX: Heat Lock
+       if (p.stats.heat >= 90) {
+           return { success: false, message: "HEAT CRITICAL. Safehouse required immediately." };
+       }
+
        const hasPending = DB.missionRuns.some(r => r.playerId === p.id && (r.narrative === 'PENDING' || r.combatState?.isActive));
        if (hasPending) {
            return { success: false, message: "Operation in progress." };
@@ -640,7 +823,9 @@ export const api = {
               turnCount: 1,
               enemy,
               logs: [{ turn: 1, message: `Hostile contact! ${enemy.name} engages you.`, type: 'INFO' }],
-              playerDefending: false
+              playerDefending: false,
+              activeEffects: {},
+              abilityCooldowns: {}
           };
           run.narrative = "COMBAT_STARTED";
           saveState();
@@ -652,14 +837,15 @@ export const api = {
       let rewards = { money: 0, exp: 0 };
       let penalties = { hpLoss: 0, heatGain: 0 };
 
-      // CHECK FOR MASTERY BONUS (Passive)
       const isMastered = (p.missionMastery[mission.id] || 0) >= 100;
-      const masteryMultiplier = isMastered ? 1.25 : 1.0; // 25% Bonus for mastered missions
+      const masteryMultiplier = isMastered ? 1.25 : 1.0;
 
       if (isSuccess) {
         let diffMult = mission.difficulty <= 3 ? 0.8 : mission.difficulty >= 7 ? 1.3 : 1.0;
         const riskMult = mission.risk === 'Low' ? 0.9 : mission.risk === 'High' ? 1.4 : 1.0;
-        const luckBonus = 1 + clamp(p.stats.lck / 300, 0, 0.15);
+        
+        // REVISED: LUCK Scaling
+        const luckBonus = 1 + calculateContribution(p.stats.lck, 0.2, 50);
 
         rewards.money = Math.round(mission.baseReward * diffMult * riskMult * luckBonus * masteryMultiplier);
         rewards.exp = Math.round(mission.baseXp * diffMult * (1 + p.level / 200) * masteryMultiplier);
@@ -681,9 +867,10 @@ export const api = {
 
         penalties.heatGain = Math.round(getBaseHeatForRisk(mission.risk) * heatModifier);
         
-        // CREW TRAIT: EX-CORPO / PSYCHO
         p.crew.filter(c => c.isActive).forEach(c => {
+           // @ts-ignore
            if (c.trait === 'Ex-Corpo') penalties.heatGain = Math.floor(penalties.heatGain * 0.95);
+           // @ts-ignore
            if (c.trait === 'Psycho') penalties.heatGain += 1;
         });
 
@@ -694,18 +881,21 @@ export const api = {
             }
         });
 
+        // REVISED: Daily Income Cap Scaling
         const ONE_DAY = 24 * 60 * 60 * 1000;
         const recentRuns = DB.missionRuns.filter(r => r.playerId === p.id && r.timestamp > (Date.now() - ONE_DAY));
         const dailyIncome = recentRuns.reduce((sum, r) => sum + r.gangGained, 0);
-        const MAX_DAILY_GANG = 5000;
+        
+        // Income cap grows with level
+        const MAX_DAILY_GANG = 5000 * (1 + (p.level * 0.2));
 
         if (dailyIncome >= MAX_DAILY_GANG) rewards.money = 0;
         else if (dailyIncome + rewards.money > MAX_DAILY_GANG) rewards.money = MAX_DAILY_GANG - dailyIncome;
 
       } else {
         rewards.exp = Math.floor(mission.baseXp * 0.1);
-        const totals = calculateTotalStats(p);
-        penalties.hpLoss = Math.max(1, Math.round((5 + mission.costEnr * 0.8) - (totals.def / 5)));
+        const { estHpLoss } = getMissionFactors(p, mission);
+        penalties.hpLoss = estHpLoss;
         penalties.heatGain = Math.round((5 + getBaseHeatForRisk(mission.risk)) * heatModifier);
         
         if (p.stats.heat > 50) penalties.heatGain += 5;
@@ -714,9 +904,10 @@ export const api = {
             penalties.hpLoss = Math.floor(penalties.hpLoss * 0.9);
         }
 
-        // CREW TRAIT: EX-CORPO / PSYCHO (Apply to failure too)
         p.crew.filter(c => c.isActive).forEach(c => {
+           // @ts-ignore
            if (c.trait === 'Ex-Corpo') penalties.heatGain = Math.floor(penalties.heatGain * 0.95);
+           // @ts-ignore
            if (c.trait === 'Psycho') penalties.heatGain += 1;
         });
       }
@@ -730,7 +921,7 @@ export const api = {
       const currentMastery = p.missionMastery[mission.id] || 0;
       let masteryMsg = "";
       if (currentMastery < 100) {
-          const gain = isSuccess ? 5 : 2; // Increased from 3/1 to 5/2 for faster feedback
+          const gain = isSuccess ? 5 : 2; 
           const newMastery = Math.min(100, currentMastery + gain);
           p.missionMastery[mission.id] = newMastery;
           
@@ -811,19 +1002,28 @@ export const api = {
   },
 
   combat: {
-      action: async (runId: string, actionType: 'ATTACK' | 'HEAVY' | 'DEFEND' | 'FLEE'): Promise<ApiResponse<Player>> => {
+      action: async (runId: string, actionType: 'ATTACK' | 'HEAVY' | 'DEFEND' | 'FLEE' | 'USE_SKILL', skillId?: string): Promise<ApiResponse<Player>> => {
           if (!DB.player) return { success: false };
           const run = DB.missionRuns.find(r => r.id === runId);
           if (!run || !run.combatState || !run.combatState.isActive) return { success: false, message: "No active combat." };
           
           let p = { ...DB.player };
           const cs = run.combatState;
+          
+          // Ensure combat properties exist for older saves
+          if (!cs.abilityCooldowns) cs.abilityCooldowns = {};
+          if (!cs.activeEffects) cs.activeEffects = {};
+
           const enemy = cs.enemy;
           const stats = calculateTotalStats(p);
           
           let playerDmg = 0;
           let playerMsg = "";
-          let playerHit = false;
+          
+          // Cooldown Tick Down (Start of turn)
+          Object.keys(cs.abilityCooldowns).forEach(k => {
+              if (cs.abilityCooldowns[k] > 0) cs.abilityCooldowns[k]--;
+          });
 
           // PLAYER TURN
           if (actionType === 'DEFEND') {
@@ -837,7 +1037,7 @@ export const api = {
                   cs.isActive = false;
                   run.narrative = "Escaped from combat.";
                   run.success = false;
-                  run.hpChange = p.stats.hp - DB.player.stats.hp; // Delta
+                  run.hpChange = p.stats.hp - DB.player.stats.hp; 
                   DB.player = p;
                   saveState();
                   return { 
@@ -855,8 +1055,48 @@ export const api = {
                   playerMsg = "Escape failed! You are cornered.";
                   cs.logs.push({ turn: cs.turnCount, message: playerMsg, type: 'FAILURE' });
               }
+          } else if (actionType === 'USE_SKILL' && skillId) {
+              const skill = SKILL_DATABASE.find(s => s.id === skillId);
+              if (!skill || skill.effect.type !== 'COMBAT_ABILITY') {
+                  playerMsg = "Invalid skill.";
+              } else {
+                  // APPLY SKILL LOGIC
+                  const eff = skill.effect;
+                  cs.abilityCooldowns[skillId] = (eff.cooldown || 3) + 1; // +1 because we tick down at start of next turn
+
+                  if (eff.target === 'damage_mult') {
+                      const baseDmg = stats.atk * eff.value;
+                      // MATH FIX: Mitigation Formula
+                      playerDmg = Math.round(baseDmg * (100 / (100 + (enemy.def * 0.5))));
+                      playerMsg = `${skill.name}! Massive impact.`;
+                      enemy.hp -= playerDmg;
+                      cs.logs.push({ turn: cs.turnCount, message: `${playerMsg} Dealt ${playerDmg} DMG.`, type: 'ABILITY', damage: playerDmg });
+                  } 
+                  else if (eff.target === 'debuff_atk') {
+                      const dmg = Math.round(stats.cInt * 1.5);
+                      playerDmg = dmg;
+                      enemy.hp -= dmg;
+                      enemy.atk = Math.max(1, Math.round(enemy.atk * 0.5)); // Permanent for fight
+                      playerMsg = `${skill.name}! Enemy systems compromised. ATK Reduced.`;
+                      cs.logs.push({ turn: cs.turnCount, message: `${playerMsg} Dealt ${playerDmg} DMG.`, type: 'ABILITY', damage: playerDmg });
+                  }
+                  else if (eff.target === 'crit_guarantee') {
+                      const baseDmg = stats.atk;
+                      playerDmg = Math.round((baseDmg * 2.5) * (100 / (100 + enemy.def)));
+                      playerMsg = `${skill.name}! Perfect shot.`;
+                      enemy.hp -= playerDmg;
+                      cs.logs.push({ turn: cs.turnCount, message: `${playerMsg} CRITICAL HIT! ${playerDmg} DMG.`, type: 'ABILITY', damage: playerDmg });
+                  }
+                  else if (eff.target === 'mitigation') {
+                      cs.activeEffects['mitigation'] = 1; // Lasts 1 turn (enemy turn)
+                      const heal = 25;
+                      p.stats.hp = Math.min(p.stats.maxHp, p.stats.hp + heal);
+                      playerMsg = `${skill.name}! You vanish in smoke. Healed ${heal} HP.`;
+                      cs.logs.push({ turn: cs.turnCount, message: playerMsg, type: 'ABILITY' });
+                  }
+              }
           } else {
-              // ATTACK
+              // BASIC ATTACK
               let mult = 1.0;
               if (actionType === 'HEAVY') {
                   if (p.stats.sta >= 10) {
@@ -873,11 +1113,15 @@ export const api = {
               
               const baseDmg = stats.atk * mult;
               const variance = (Math.random() * 0.4) + 0.8; // 0.8 to 1.2
-              playerDmg = Math.max(1, Math.round((baseDmg * variance) - (enemy.def * 0.5)));
+              const rawHit = baseDmg * variance;
+              
+              // MATH FIX: Percentage Mitigation
+              // Dmg = Raw * (100 / (100 + Def))
+              playerDmg = Math.max(1, Math.round(rawHit * (100 / (100 + enemy.def))));
               
               // Crit check
               if (Math.random() < 0.05 + (stats.cInt * 0.005)) {
-                  playerDmg = Math.round(playerDmg * 2);
+                  playerDmg = Math.round(playerDmg * 1.5);
                   playerMsg += " CRITICAL HIT!";
               }
 
@@ -893,7 +1137,7 @@ export const api = {
               const isMastered = (p.missionMastery[mission.id] || 0) >= 100;
               const masteryMultiplier = isMastered ? 1.25 : 1.0;
 
-              const money = Math.round(mission.baseReward * 1.2 * masteryMultiplier); // Combat bonus
+              const money = Math.round(mission.baseReward * 1.2 * masteryMultiplier);
               const exp = Math.round(mission.baseXp * 1.5 * masteryMultiplier);
               
               p.wallet += money;
@@ -922,14 +1166,24 @@ export const api = {
 
           // ENEMY TURN
           if (actionType !== 'FLEE' || (actionType === 'FLEE')) { // Enemy attacks if you defend, attack, or fail flee
-             let enemyDmg = Math.max(1, Math.round((enemy.atk * ((Math.random() * 0.4) + 0.8)) - (stats.def * 0.5)));
-             if (cs.playerDefending) {
-                 enemyDmg = Math.max(1, Math.round(enemyDmg * 0.5));
-                 cs.playerDefending = false; // Reset stance
+             // Check mitigation (Flashbang)
+             if (cs.activeEffects['mitigation'] && cs.activeEffects['mitigation'] > 0) {
+                 cs.logs.push({ turn: cs.turnCount, message: `${enemy.name} attacks but misses in the smoke!`, type: 'INFO' });
+                 cs.activeEffects['mitigation']--;
+             } else {
+                 let rawEnemyDmg = Math.round((enemy.atk * ((Math.random() * 0.4) + 0.8)));
+                 
+                 // MATH FIX: Player Defense Mitigation
+                 let enemyDmg = Math.max(1, Math.round(rawEnemyDmg * (100 / (100 + stats.def))));
+
+                 if (cs.playerDefending) {
+                     enemyDmg = Math.max(1, Math.round(enemyDmg * 0.5));
+                     cs.playerDefending = false; // Reset stance
+                 }
+                 
+                 p.stats.hp -= enemyDmg;
+                 cs.logs.push({ turn: cs.turnCount, message: `${enemy.name} attacks! You took ${enemyDmg} DMG.`, type: 'ENEMY_HIT', damage: enemyDmg });
              }
-             
-             p.stats.hp -= enemyDmg;
-             cs.logs.push({ turn: cs.turnCount, message: `${enemy.name} attacks! You took ${enemyDmg} DMG.`, type: 'ENEMY_HIT', damage: enemyDmg });
           }
 
           // CHECK PLAYER DEATH
@@ -963,14 +1217,13 @@ export const api = {
           DB.player = p;
           saveState();
           
-          // CRITICAL FIX: Return a new object reference for React to pick up changes
           return { 
               success: true, 
               data: p, 
               combatState: { 
                   ...cs, 
-                  enemy: { ...cs.enemy }, // Clone enemy so HP updates trigger re-render
-                  logs: [...cs.logs]      // Clone logs array so UI updates
+                  enemy: { ...cs.enemy }, 
+                  logs: [...cs.logs]
               } 
           };
       }

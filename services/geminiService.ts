@@ -106,7 +106,7 @@ export const generateMissionNarrative = async (
   }
 
   // Use the objectives passed in outcome, fallback to mission static objectives
-  const objectivesToUse = outcome.objectives || mission.objectives;
+  const objectivesToUse = outcome.objectives || mission.objectives || ["Complete the assignment"];
 
   // Prepare Payload for AI & Cache Key
   const inputData: NarrativeInput = {
@@ -136,20 +136,21 @@ export const generateMissionNarrative = async (
   // 3. Construct Prompt
   const prompt = `
     Role: Cyberpunk Game Master.
-    Task: Write a 1-2 sentence resolution for a mission (Max 45 words).
+    Task: Write a 1-2 sentence resolution for a mission (Max 50 words).
     
     CONTEXT:
     Mission: ${mission.title}
-    Success: ${inputData.success ? 'YES' : 'NO'}
+    Result: ${inputData.success ? 'SUCCESS' : 'FAILURE'}
     
-    KEY OBJECTIVES:
-    ${objectivesToUse.map((o, i) => `${i+1}. ${o}`).join('\n')}
+    TACTICAL OBJECTIVES:
+    ${objectivesToUse.map((obj, i) => `${i + 1}. ${obj}`).join('\n    ')}
     
     INSTRUCTIONS:
-    - Focus on ONE specific objective from the list above.
-    - If SUCCESS: Narrate the specific action the agent took to complete that objective.
-    - If FAILURE: Narrate exactly how that objective failed (e.g. alarm tripped, target escaped).
-    - Tone: Gritty, fast-paced. Do not simply list results.
+    - You MUST explicitly reference the Primary Objective ("${objectivesToUse[0]}") in the narrative.
+    - If SUCCESS: Describe how the agent completed the objectives (e.g., "Hacked the mainframe and retrieved the data").
+    - If FAILURE: Describe the specific complication that prevented objective completion (e.g., "Security protocols locked down the mainframe before extraction").
+    - Incorporate the district (${mission.district}) atmosphere.
+    - Keep it under 50 words.
     
     INPUT DATA:
     ${JSON.stringify(inputData)}

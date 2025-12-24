@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import CharacterCreation from './components/CharacterCreation';
 import AdminPanel from './components/AdminPanel';
@@ -6,6 +7,7 @@ import { SkillTreeUI } from './components/SkillTreeUI';
 import { InventoryMarketUI } from './components/InventoryMarketUI';
 import { CrewUI } from './components/CrewUI';
 import { CombatUI } from './components/CombatUI';
+import { SystemMenu } from './components/SystemMenu';
 import { Player, FactionId, ProfessionId, Mission, MissionType, CrewMember, LogEntry, Item, ItemType, ItemRarity, MissionOutcome, DistrictMeta, District, DailyRewardResult, CombatState } from './types';
 import { api } from './services/api';
 
@@ -21,6 +23,7 @@ const App: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [showMissionIntel, setShowMissionIntel] = useState(false);
+  const [showSystemMenu, setShowSystemMenu] = useState(false);
   
   // Admin State
   const [showAdmin, setShowAdmin] = useState(false);
@@ -298,7 +301,7 @@ const App: React.FC = () => {
   const canClaimReward = player.lastLoginDate !== new Date().toISOString().split('T')[0];
 
   return (
-    <div className="min-h-screen bg-black text-slate-300 font-mono flex flex-col md:flex-row overflow-hidden relative">
+    <div className="h-[100dvh] bg-black text-slate-300 font-mono flex flex-col md:flex-row overflow-hidden relative">
       
       {/* ADMIN OVERLAY */}
       {showAdmin && (
@@ -319,88 +322,109 @@ const App: React.FC = () => {
           <MissionStructureInfo onClose={() => setShowMissionIntel(false)} />
       )}
 
+      {/* SYSTEM MENU MODAL */}
+      {showSystemMenu && (
+          <SystemMenu onClose={() => setShowSystemMenu(false)} onLog={addLog} />
+      )}
+
       {/* ADMIN TOGGLE */}
       <button 
         onClick={() => setShowAdmin(true)}
-        className="fixed bottom-2 right-2 z-50 text-[10px] text-zinc-800 hover:text-red-500 uppercase tracking-widest opacity-50 hover:opacity-100"
+        className="fixed bottom-2 right-2 z-50 text-[10px] text-zinc-800 hover:text-red-500 uppercase tracking-widest opacity-50 hover:opacity-100 hidden md:block"
       >
         System.Override()
       </button>
 
+      {/* SETTINGS TOGGLE (Top Right) */}
+      <button 
+        onClick={() => setShowSystemMenu(true)}
+        className="fixed top-2 right-2 z-50 p-2 text-zinc-500 hover:text-white transition-colors"
+        title="System Settings"
+      >
+        <span className="text-xl">⚙</span>
+      </button>
+
       {/* LEFT PANEL: STATS / LOGS */}
-      <aside className="w-full md:w-80 bg-panel-bg border-r border-zinc-800 flex flex-col shrink-0 z-10">
-        <div className="p-6 border-b border-zinc-800">
-            <h1 className="text-2xl font-bold text-white tracking-tighter mb-1">SHADOW<span className="text-neon-red">SYNDICATE</span></h1>
-            <div className="text-xs text-zinc-500 flex justify-between mb-2">
-                <span>{player.faction}</span>
-                <span>DAY {player.day}</span>
+      <aside className="w-full md:w-80 bg-panel-bg border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col shrink-0 z-10 md:h-full relative shadow-2xl md:shadow-none">
+        <div className="p-4 md:p-6 border-b border-zinc-800 bg-zinc-950 md:bg-transparent flex justify-between items-center md:block">
+            <div>
+                <h1 className="text-xl md:text-2xl font-bold text-white tracking-tighter mb-1">SHADOW<span className="text-neon-red">SYNDICATE</span></h1>
+                <div className="text-[10px] md:text-xs text-zinc-500 flex gap-4 md:justify-between mb-0 md:mb-2">
+                    <span>{player.faction}</span>
+                    <span>DAY {player.day}</span>
+                </div>
+            </div>
+            {/* Mobile-only wallet display since full stats are hidden */}
+            <div className="md:hidden text-right">
+                <div className="text-yellow-400 font-bold text-sm">${player.wallet.toLocaleString()}</div>
+                <div className="text-[9px] text-zinc-600 uppercase">CREDITS</div>
             </div>
         </div>
 
-        <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+        <div className="p-3 md:p-6 space-y-4 md:space-y-6 md:flex-1 md:overflow-y-auto bg-zinc-900/50 md:bg-transparent">
             {/* MINI PLAYER CARD FOR STATS VIEW */}
-            <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-1 gap-4">
                 <div>
-                    <div className="flex justify-between text-xs mb-1 uppercase tracking-wider">
+                    <div className="flex justify-between text-[10px] md:text-xs mb-1 uppercase tracking-wider">
                         <span className="text-neon-red">Health</span>
-                        <span>{player.stats.hp} / {player.stats.maxHp}</span>
+                        <span>{player.stats.hp}/{player.stats.maxHp}</span>
                     </div>
-                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-1.5 md:h-2 bg-zinc-800 rounded-full overflow-hidden">
                         <div className="h-full bg-neon-red" style={{ width: `${(player.stats.hp / player.stats.maxHp) * 100}%` }}></div>
                     </div>
                 </div>
                 <div>
-                    <div className="flex justify-between text-xs mb-1 uppercase tracking-wider">
+                    <div className="flex justify-between text-[10px] md:text-xs mb-1 uppercase tracking-wider">
                         <span className="text-yellow-400">Energy</span>
-                        <span>{player.stats.enr} / {player.stats.maxEnr}</span>
+                        <span>{player.stats.enr}/{player.stats.maxEnr}</span>
                     </div>
-                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-1.5 md:h-2 bg-zinc-800 rounded-full overflow-hidden">
                         <div className="h-full bg-yellow-400" style={{ width: `${(player.stats.enr / player.stats.maxEnr) * 100}%` }}></div>
                     </div>
                 </div>
             </div>
 
-            {/* ACTION MENU */}
-            <div className="space-y-2">
+            {/* ACTION MENU - SCROLLABLE ON MOBILE */}
+            <div className="flex md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none md:space-y-2">
                 <button 
                     onClick={() => setView('DASHBOARD')}
                     disabled={view === 'COMBAT'}
-                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'DASHBOARD' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    className={`flex-shrink-0 md:w-full text-left px-3 py-2 md:px-4 md:py-3 rounded text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${view === 'DASHBOARD' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
                     Dashboard
                 </button>
                 <button 
                     onClick={() => setView('MISSIONS')}
                     disabled={view === 'COMBAT'}
-                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'MISSIONS' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    className={`flex-shrink-0 md:w-full text-left px-3 py-2 md:px-4 md:py-3 rounded text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${view === 'MISSIONS' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
                     Missions
                 </button>
                 <button 
                     onClick={() => setView('CREW')}
                     disabled={view === 'COMBAT'}
-                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'CREW' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    className={`flex-shrink-0 md:w-full text-left px-3 py-2 md:px-4 md:py-3 rounded text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${view === 'CREW' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
                     Syndicate Crew
                 </button>
                 <button 
                     onClick={() => setView('MARKET')}
                     disabled={view === 'COMBAT'}
-                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'MARKET' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    className={`flex-shrink-0 md:w-full text-left px-3 py-2 md:px-4 md:py-3 rounded text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${view === 'MARKET' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
-                    Shadow Market
+                    Market
                 </button>
                 <button 
                     onClick={() => setView('SKILLS')}
                     disabled={view === 'COMBAT'}
-                    className={`w-full text-left px-4 py-3 rounded text-xs font-bold uppercase tracking-widest transition-all ${view === 'SKILLS' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    className={`flex-shrink-0 md:w-full text-left px-3 py-2 md:px-4 md:py-3 rounded text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${view === 'SKILLS' ? 'bg-neon-blue text-black' : 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-800'} ${view === 'COMBAT' ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
-                    Neural Skills
+                    Skills
                 </button>
             </div>
 
-            {/* SYSTEM LOGS */}
-            <div className="flex-1 bg-black border border-zinc-800 p-2 font-mono text-[10px] overflow-hidden flex flex-col min-h-[150px]">
+            {/* SYSTEM LOGS - HIDDEN ON MOBILE TO SAVE SPACE */}
+            <div className="hidden md:flex flex-1 bg-black border border-zinc-800 p-2 font-mono text-[10px] overflow-hidden flex-col min-h-[150px]">
                 <div className="text-zinc-500 border-b border-zinc-900 pb-1 mb-1">SYSTEM LOG</div>
                 <div className="overflow-y-auto flex-1 space-y-1 scrollbar-thin scrollbar-thumb-zinc-800">
                     {logs.map((log) => (
@@ -421,7 +445,7 @@ const App: React.FC = () => {
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto bg-black p-4 relative">
+      <main className="flex-1 overflow-y-auto bg-black p-4 relative scrollbar-thin scrollbar-thumb-zinc-800">
          
          {/* DASHBOARD VIEW */}
          {view === 'DASHBOARD' && (
@@ -467,8 +491,8 @@ const App: React.FC = () => {
 
          {/* MISSIONS VIEW */}
          {view === 'MISSIONS' && (
-             <div className="space-y-6 animate-in fade-in duration-500">
-                 <div className="flex justify-between items-end mb-4 px-4">
+             <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 px-1 md:px-4 gap-4">
                     <div>
                         <h2 className="text-2xl text-white font-bold uppercase tracking-widest">Available Contracts</h2>
                         <div className="text-zinc-500 text-xs mt-1">Select a district to view local opportunities</div>
@@ -476,7 +500,7 @@ const App: React.FC = () => {
                     <select 
                         value={selectedDistrict}
                         onChange={(e) => setSelectedDistrict(e.target.value as District)}
-                        className="bg-zinc-900 border border-zinc-700 text-white text-sm p-2 rounded outline-none focus:border-neon-blue"
+                        className="w-full md:w-auto bg-zinc-900 border border-zinc-700 text-white text-sm p-3 md:p-2 rounded outline-none focus:border-neon-blue"
                     >
                         {districts.map(d => (
                             <option key={d.id} value={d.id}>{d.name}</option>

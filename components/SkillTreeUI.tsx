@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Player, Skill, ProfessionId } from '../types';
 import { api } from '../services/api';
@@ -42,6 +43,7 @@ export const SkillTreeUI: React.FC<SkillTreeUIProps> = ({ player, onUpdate, onLo
     const isUnlocked = player.unlockedSkills.includes(skill.id);
     const canAfford = player.skillPoints >= skill.cost;
     const isLocked = !isUnlocked && !canAfford;
+    const isActiveAbility = skill.effect.type === 'COMBAT_ABILITY';
 
     return (
       <div 
@@ -56,13 +58,19 @@ export const SkillTreeUI: React.FC<SkillTreeUIProps> = ({ player, onUpdate, onLo
         `}
         onClick={() => !isUnlocked && canAfford && !processing ? handleUnlock(skill.id) : null}
       >
+        {isActiveAbility && (
+            <div className="absolute top-2 right-2 text-[10px] bg-red-900 text-red-100 px-2 py-0.5 rounded font-bold border border-red-500/50">
+                ACTIVE ABILITY
+            </div>
+        )}
+
         <div>
-          <div className="flex justify-between items-start mb-2">
+          <div className="flex justify-between items-start mb-2 mt-2">
              <div className={`font-bold uppercase tracking-wider ${isUnlocked ? 'text-neon-green' : 'text-white'}`}>
                 {skill.name}
              </div>
              {isUnlocked ? (
-                 <span className="text-[10px] bg-neon-green text-black px-2 py-0.5 font-bold rounded">ACTIVE</span>
+                 <span className="text-[10px] bg-neon-green text-black px-2 py-0.5 font-bold rounded">OWNED</span>
              ) : (
                  <span className={`text-xs font-bold ${canAfford ? 'text-neon-blue' : 'text-zinc-600'}`}>
                     {skill.cost} SP
@@ -80,6 +88,9 @@ export const SkillTreeUI: React.FC<SkillTreeUIProps> = ({ player, onUpdate, onLo
                   skill.effect.target === 'success_chance' ? `+${(skill.effect.value * 100)}% Success Chance` :
                   skill.effect.target === 'money_reward' ? `+${(skill.effect.value * 100)}% Payouts` :
                   skill.effect.target === 'heat_reduction' ? `-${(skill.effect.value * 100)}% Heat Gain` : ''
+              )}
+              {skill.effect.type === 'COMBAT_ABILITY' && (
+                  <span className="text-yellow-400 font-bold">Unlocks Combat Action (CD: {skill.effect.cooldown}T)</span>
               )}
            </div>
         </div>

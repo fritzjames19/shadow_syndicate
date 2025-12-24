@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { FactionId, Faction, ProfessionId, Profession } from '../types';
 
@@ -92,33 +93,33 @@ const CharacterCreation: React.FC<Props> = ({ onComplete }) => {
           backgroundSize: '40px 40px' 
       }}></div>
       
-      <div className="w-full max-w-4xl bg-panel-bg border border-zinc-800 p-8 shadow-2xl relative z-10">
+      <div className="w-full max-w-4xl bg-panel-bg border border-zinc-800 p-6 md:p-8 shadow-2xl relative z-10">
         <div className="flex justify-between items-start mb-8 border-b border-zinc-800 pb-4">
             <div>
-                <h1 className="text-4xl text-white font-bold tracking-tighter mb-1">SHADOW<span className="text-neon-red">SYNDICATE</span></h1>
-                <h2 className="text-xs text-zinc-500 uppercase tracking-[0.3em]">Identity Protocol // v3.0</h2>
+                <h1 className="text-2xl md:text-4xl text-white font-bold tracking-tighter mb-1">SHADOW<span className="text-neon-red">SYNDICATE</span></h1>
+                <h2 className="text-[10px] md:text-xs text-zinc-500 uppercase tracking-[0.3em]">Identity Protocol // v3.0</h2>
             </div>
             <div className="text-right">
-                <div className="text-xs text-zinc-600 uppercase mb-1">PROGRESS</div>
-                <div className="flex gap-1">
-                    <div className={`w-8 h-2 ${step >= 1 ? 'bg-neon-blue' : 'bg-zinc-800'}`}></div>
-                    <div className={`w-8 h-2 ${step >= 2 ? 'bg-neon-blue' : 'bg-zinc-800'}`}></div>
+                <div className="text-[10px] md:text-xs text-zinc-600 uppercase mb-1">PROGRESS</div>
+                <div className="flex gap-1 justify-end">
+                    <div className={`w-6 h-1.5 md:w-8 md:h-2 ${step >= 1 ? 'bg-neon-blue' : 'bg-zinc-800'}`}></div>
+                    <div className={`w-6 h-1.5 md:w-8 md:h-2 ${step >= 2 ? 'bg-neon-blue' : 'bg-zinc-800'}`}></div>
                 </div>
             </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8 min-h-[400px]">
+        <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8 min-h-[400px]">
           
           {/* STEP 1: ALIAS & FACTION */}
           {step === 1 && (
              <div className="animate-in fade-in slide-in-from-right-8 duration-300">
-                <div className="mb-8">
-                    <label className="block text-neon-blue mb-2 text-sm uppercase font-bold tracking-widest">Identify Yourself</label>
+                <div className="mb-6 md:mb-8">
+                    <label className="block text-neon-blue mb-2 text-xs md:text-sm uppercase font-bold tracking-widest">Identify Yourself</label>
                     <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-black border-2 border-zinc-800 p-4 text-white focus:border-neon-blue outline-none transition-colors text-lg tracking-wider font-bold"
+                    className="w-full bg-black border-2 border-zinc-800 p-3 md:p-4 text-white focus:border-neon-blue outline-none transition-colors text-base md:text-lg tracking-wider font-bold"
                     placeholder="ENTER ALIAS..."
                     maxLength={15}
                     autoFocus
@@ -126,7 +127,7 @@ const CharacterCreation: React.FC<Props> = ({ onComplete }) => {
                 </div>
 
                 <div>
-                    <label className="block text-neon-blue mb-4 text-sm uppercase font-bold tracking-widest">Select Allegiance</label>
+                    <label className="block text-neon-blue mb-4 text-xs md:text-sm uppercase font-bold tracking-widest">Select Allegiance</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {FACTIONS.map((f) => (
                         <div
@@ -153,7 +154,7 @@ const CharacterCreation: React.FC<Props> = ({ onComplete }) => {
           {/* STEP 2: PROFESSION */}
           {step === 2 && (
              <div className="animate-in fade-in slide-in-from-right-8 duration-300">
-                 <h3 className="text-neon-blue mb-4 text-sm uppercase font-bold tracking-widest">Choose Your Path</h3>
+                 <h3 className="text-neon-blue mb-4 text-xs md:text-sm uppercase font-bold tracking-widest">Choose Your Path</h3>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      {PROFESSIONS.map((p) => {
                          const isSelected = selectedProfession === p.id;
@@ -164,16 +165,16 @@ const CharacterCreation: React.FC<Props> = ({ onComplete }) => {
                             <div
                                 key={p.id}
                                 onClick={() => setSelectedProfession(p.id)}
-                                className={`cursor-pointer border-2 p-5 transition-all hover:bg-zinc-900 relative group ${borderColor} ${isSelected ? 'bg-zinc-900 shadow-lg' : ''}`}
+                                className={`cursor-pointer border-2 p-4 md:p-5 transition-all hover:bg-zinc-900 relative group ${borderColor} ${isSelected ? 'bg-zinc-900 shadow-lg' : ''}`}
                             >
                                 <div className="flex justify-between items-start mb-2">
-                                    <div className={`font-bold text-xl uppercase tracking-tighter ${isSelected ? 'text-white' : textColor}`}>
+                                    <div className={`font-bold text-lg md:text-xl uppercase tracking-tighter ${isSelected ? 'text-white' : textColor}`}>
                                         {p.name}
                                     </div>
-                                    {isSelected && <div className="text-xs bg-white text-black px-2 py-0.5 font-bold">SELECTED</div>}
+                                    {isSelected && <div className="text-[10px] bg-white text-black px-2 py-0.5 font-bold">SELECTED</div>}
                                 </div>
-                                <div className="text-xs text-zinc-500 uppercase tracking-widest mb-3">{p.role}</div>
-                                <p className="text-sm text-zinc-400 mb-4 h-10">{p.description}</p>
+                                <div className="text-[10px] md:text-xs text-zinc-500 uppercase tracking-widest mb-3">{p.role}</div>
+                                <p className="text-xs md:text-sm text-zinc-400 mb-4 h-10 leading-relaxed">{p.description}</p>
                                 
                                 <div className="space-y-1">
                                     {p.bonuses.map((b, i) => (
@@ -196,7 +197,7 @@ const CharacterCreation: React.FC<Props> = ({ onComplete }) => {
                 <button
                     type="button"
                     onClick={() => setStep(1)}
-                    className="flex-1 p-4 border border-zinc-700 text-zinc-500 font-bold uppercase tracking-widest hover:text-white hover:border-zinc-500 transition-colors"
+                    className="flex-1 p-3 md:p-4 border border-zinc-700 text-zinc-500 font-bold uppercase tracking-widest hover:text-white hover:border-zinc-500 transition-colors text-sm"
                 >
                     Back
                 </button>
@@ -207,7 +208,7 @@ const CharacterCreation: React.FC<Props> = ({ onComplete }) => {
                     type="button"
                     onClick={() => setStep(2)}
                     disabled={!name || !selectedFaction}
-                    className={`flex-1 p-4 font-bold text-black uppercase tracking-widest transition-all ${
+                    className={`flex-1 p-3 md:p-4 font-bold text-black uppercase tracking-widest transition-all text-sm ${
                         name && selectedFaction 
                         ? 'bg-white hover:bg-neon-blue' 
                         : 'bg-zinc-800 cursor-not-allowed text-zinc-600'
@@ -219,7 +220,7 @@ const CharacterCreation: React.FC<Props> = ({ onComplete }) => {
                 <button
                     type="submit"
                     disabled={!selectedProfession}
-                    className={`flex-[2] p-4 font-bold text-black uppercase tracking-widest transition-all shadow-lg ${
+                    className={`flex-[2] p-3 md:p-4 font-bold text-black uppercase tracking-widest transition-all shadow-lg text-sm ${
                         selectedProfession 
                         ? 'bg-neon-blue hover:bg-white hover:shadow-[0_0_20px_rgba(0,243,255,0.6)]' 
                         : 'bg-zinc-800 cursor-not-allowed text-zinc-600'
